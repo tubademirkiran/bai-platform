@@ -36,7 +36,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false)
   const [activeSettingsTab, setActiveSettingsTab] = useState<'profile' | 'appearance' | 'billing'>('profile')
   
-  // PROFİL KAYDETME STATE'LERİ (YENİ EKLENDİ)
+  // PROFİL KAYDETME STATE'LERİ
   const [fullName, setFullName] = useState('')
   const [isSaving, setIsSaving] = useState(false)
   const [showSuccess, setShowSuccess] = useState(false)
@@ -80,7 +80,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     supabase.auth.getUser().then(({ data }) => {
       if (!data.user) router.push('/login')
-      else setUser(data.user)
+      else {
+        setUser(data.user)
+        // Ad Soyad'ı kullanıcı metadata'sından yükle
+        const meta = data.user.user_metadata as { full_name?: string } | undefined
+        if (meta?.full_name) setFullName(meta.full_name)
+      }
     })
   }, [router])
 
@@ -99,16 +104,19 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     router.push(href)
   }
 
-  // PROFİLİ KAYDETME FONKSİYONU (YENİ EKLENDİ)
-  const handleSaveProfile = () => {
+  // PROFİLİ KAYDETME FONKSİYONU — Supabase user metadata'sına gerçek kayıt
+  const handleSaveProfile = async () => {
     setIsSaving(true)
-    // Gerçek bir API isteğini simüle etmek için 1 saniye bekletiyoruz
-    setTimeout(() => {
-      setIsSaving(false)
+    try {
+      const { error } = await supabase.auth.updateUser({ data: { full_name: fullName } })
+      if (error) throw error
       setShowSuccess(true)
-      // 3 saniye sonra "Kaydedildi" mesajını eski haline döndürüyoruz
       setTimeout(() => setShowSuccess(false), 3000)
-    }, 1000)
+    } catch (err) {
+      console.error('Profil kaydedilemedi:', err)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const tTheme = themes[theme as keyof typeof themes] || themes.purple
@@ -142,6 +150,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       id: 'analiz',
       title: lang === 'tr' ? 'ANALİZ' : 'ANALYSIS',
       items: [
+        // ATLAS STUDIO BURAYA EKLENDİ!
+        { href: '/dashboard/bmad-studio', label: 'Atlas Studio', icon: <TerminalSquare size={18} /> },
         { href: '/dashboard/risk', label: lang === 'tr' ? 'Risk Analyzer' : 'Risk Analyzer', icon: <AlertTriangle size={18} /> },
         { href: '/dashboard/meeting', label: lang === 'tr' ? 'Meeting Analyzer' : 'Meeting Analyzer', icon: <Mic size={18} /> },
         { href: '/dashboard/flowchart', label: lang === 'tr' ? 'Flowchart' : 'Flowchart', icon: <GitMerge size={18} /> },
@@ -374,13 +384,13 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                     </div>
                   </div>
 
-                  {/* KAYDET BUTONU EKLENDİ */}
+                  {/* KAYDET BUTONU */}
                   <div style={{ marginTop: 'auto', paddingTop: '32px', display: 'flex', justifyContent: 'flex-end' }}>
                     <button 
                       onClick={handleSaveProfile}
                       disabled={isSaving || showSuccess}
                       style={{ 
-                        background: showSuccess ? '#10b981' : accent, // Başarılıysa yeşil, değilse tema rengi
+                        background: showSuccess ? '#10b981' : accent,
                         color: '#fff', 
                         border: 'none', 
                         padding: '12px 24px', 

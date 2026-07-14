@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
-import { saveToHistory } from '@/lib/history'
+// Geçmişe kayıt server tarafında (API route) yapılıyor.
 
 type Methodology = 'waterfall' | 'agile' | 'hybrid'
 type Tab = 'scope' | 'schedule' | 'stakeholders' | 'risks'
@@ -36,13 +36,7 @@ export default function PMIPlannerPage() {
       })
       const data = await response.json()
       setResult(data.result)
-      
-      // Geçmişe Kaydet
-      await saveToHistory(
-        'PMI Project Planner',
-        `Proje: ${form.projectName}\nÖzet: ${form.summary}`,
-        JSON.stringify(data.result)
-      )
+      // Geçmişe kayıt server tarafında yapılıyor.
     } catch (error) {
       console.error(error)
     } finally {

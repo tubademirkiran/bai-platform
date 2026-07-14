@@ -3,7 +3,8 @@
 import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
-import { saveToHistory } from '@/lib/history'
+import { useGenerate } from '@/lib/use-generate'
+// Not: Geçmişe kayıt artık API route'unda (server tarafında) yapılıyor — çift kayıt olmaması için client'tan kaldırıldı.
 // 🌟 YENİ EKKLENEN IMPORTLAR
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -32,8 +33,7 @@ const templatesByLang = {
 export default function RequirementPage() {
   const { accent, colors, t, lang } = useTheme()
   const [idea, setIdea] = useState('')
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { text: result, loading, error, run } = useGenerate('/api/requirement/generate')
   const [copied, setCopied] = useState(false)
   const [showTemplates, setShowTemplates] = useState(false)
 
@@ -41,22 +41,7 @@ export default function RequirementPage() {
 
   async function handleGenerate() {
     if (!idea.trim()) return
-
-    setLoading(true)
-    setResult('')
-
-    const response = await fetch('/api/requirement/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ idea, lang }),
-    })
-
-    const data = await response.json()
-
-    await saveToHistory('requirement', idea, data.result)
-
-    setResult(data.result)
-    setLoading(false)
+    await run({ idea, lang })
   }
 
   async function handleCopy() {
@@ -120,6 +105,12 @@ export default function RequirementPage() {
           {loading ? t.reqLoading : t.reqBtn}
         </button>
       </div>
+
+      {error && (
+        <div style={{ background: '#ef444415', border: '1px solid #ef444455', color: '#ef4444', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px' }}>
+          {error}
+        </div>
+      )}
 
       {result && (
         <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '20px' }}>

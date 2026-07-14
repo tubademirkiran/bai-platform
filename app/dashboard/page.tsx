@@ -3,36 +3,39 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from '@/lib/theme-context'
+import { getHistory } from '@/lib/history'
 import { 
   FileText, Database, ListChecks, LayoutTemplate, UserCircle, 
   AlertTriangle, Mic, GitBranch, Activity, Scale, 
-  Ticket, Briefcase, Star, Clock, Sparkles, ArrowRight 
+  Ticket, Briefcase, Star, Clock, Sparkles, ArrowRight, TerminalSquare 
 } from 'lucide-react'
 
-// 1. MODÜL VERİ SETİ (Rotalar /dashboard/ altına alındı)
+// 1. MODÜL VERİ SETİ
 const MODULES = {
   uretim: [
     { id: 'req', title: 'Requirement Generator', desc: 'Fikirden otomatik gereksinim belgesi üret', badge: 'AI', Icon: FileText, route: '/dashboard/requirement' },
-    { id: 'sql', title: 'SQL Generator', desc: 'Doğal dille Oracle SQL sorgusu yaz', badge: 'Oracle', Icon: Database, route: '/dashboard/sql-generator' },
-    { id: 'test', title: 'Test Case Generator', desc: 'Gereksinimden test senaryosu üret', badge: 'QA', Icon: ListChecks, route: '/dashboard/test-case' },
+    { id: 'sql', title: 'SQL Generator', desc: 'Doğal dille Oracle SQL sorgusu yaz', badge: 'Oracle', Icon: Database, route: '/dashboard/sql' },
+    { id: 'test', title: 'Test Case Generator', desc: 'Gereksinimden test senaryosu üret', badge: 'QA', Icon: ListChecks, route: '/dashboard/testcase' },
     { id: 'wireframe', title: 'Wireframe & Prototip', desc: 'Gereksinimden otomatik ekran taslağı üret', badge: 'UI/UX', Icon: LayoutTemplate, route: '/dashboard/wireframe' },
     { id: 'persona', title: 'Persona Generator', desc: 'Hedef kitle personaları ve UX tavsiyeleri üret', badge: 'UX/BA', Icon: UserCircle, route: '/dashboard/persona' },
   ],
   analiz: [
-    { id: 'risk', title: 'Risk Analyzer', desc: 'Proje risklerini analiz et', badge: 'PM', Icon: AlertTriangle, route: '/dashboard/risk-analyzer' },
-    { id: 'meeting', title: 'Meeting Analyzer', desc: 'Toplantı notlarından aksiyon çıkar', badge: 'NLP', Icon: Mic, route: '/dashboard/meeting-analyzer' },
+    // ATLAS STUDIO BURAYA EKLENDİ!
+    { id: 'atlas', title: 'Atlas Studio', desc: 'BMAD standartlarında mimari ve kapsam oluştur', badge: 'Architect', Icon: TerminalSquare, route: '/dashboard/bmad-studio' },
+    { id: 'risk', title: 'Risk Analyzer', desc: 'Proje risklerini analiz et', badge: 'PM', Icon: AlertTriangle, route: '/dashboard/risk' },
+    { id: 'meeting', title: 'Meeting Analyzer', desc: 'Toplantı notlarından aksiyon çıkar', badge: 'NLP', Icon: Mic, route: '/dashboard/meeting' },
     { id: 'flowchart', title: 'Flowchart/Sequence', desc: 'Gereksinimden akış diyagramı üret', badge: 'QA', Icon: GitBranch, route: '/dashboard/flowchart' },
-    { id: 'impact', title: 'Impact Analyzer', desc: 'Değişiklik etki analizi yap', badge: 'QA', Icon: Activity, route: '/dashboard/impact-analyzer' },
+    { id: 'impact', title: 'Impact Analyzer', desc: 'Değişiklik etki analizi yap', badge: 'QA', Icon: Activity, route: '/dashboard/impact' },
     { id: 'prioritization', title: 'Prioritization Coach', desc: 'Gereksinimleri iş hedefine göre akıllıca önceliklendir', badge: 'PO/PM', Icon: Scale, route: '/dashboard/prioritization' },
   ],
   yonetim: [
-    { id: 'jira', title: 'AI Jira Issue Generator', desc: 'Ham talepleri teknik Jira biletlerine dönüştür', badge: 'Agile', Icon: Ticket, route: '/dashboard/jira' },
-    { id: 'pmi', title: 'PMI Project Planner', desc: 'PMI standartlarında profesyonel proje planı üret', badge: 'PMP', Icon: Briefcase, route: '/dashboard/pmi' },
+    { id: 'jira', title: 'AI Jira Issue Generator', desc: 'Ham talepleri teknik Jira biletlerine dönüştür', badge: 'Agile', Icon: Ticket, route: '/dashboard/jira-generator' },
+    { id: 'pmi', title: 'PMI Project Planner', desc: 'PMI standartlarında profesyonel proje planı üret', badge: 'PMP', Icon: Briefcase, route: '/dashboard/pmi-planner' },
   ]
 }
 
 // 2. KART ALT BİLEŞENİ
-function ModuleCard({ module, isFavorite, toggleFavorite, colors, accent }) {
+function ModuleCard({ module, isFavorite, toggleFavorite, colors, accent }: any) {
   const [isHovered, setIsHovered] = useState(false)
   const router = useRouter()
   const IconComponent = module.Icon
@@ -76,20 +79,47 @@ function ModuleCard({ module, isFavorite, toggleFavorite, colors, accent }) {
   )
 }
 
+// Geçmişteki modül adını ilgili dashboard rotasına eşler.
+const MODULE_ROUTES: Record<string, string> = {
+  'Requirement': '/dashboard/requirement',
+  'SQL Generator': '/dashboard/sql',
+  'Test Case': '/dashboard/testcase',
+  'BDD Studio': '/dashboard/bdd',
+  'Wireframe': '/dashboard/wireframe',
+  'Persona': '/dashboard/persona',
+  'Risk Analyzer': '/dashboard/risk',
+  'Meeting Analyzer': '/dashboard/meeting',
+  'Flowchart': '/dashboard/flowchart',
+  'Impact Analyzer': '/dashboard/impact',
+  'Prioritization': '/dashboard/prioritization',
+  'Jira Issue Generator': '/dashboard/jira-generator',
+  'PMI Project Planner': '/dashboard/pmi-planner',
+  'Atlas Studio': '/dashboard/bmad-studio',
+}
+
+// created_at → "2 saat önce" gibi göreli zaman.
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return 'az önce'
+  if (min < 60) return `${min} dk önce`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr} saat önce`
+  const day = Math.floor(hr / 24)
+  return `${day} gün önce`
+}
+
 // 3. ANA DASHBOARD BİLEŞENİ
 export default function DashboardPage() {
   const { accent, colors } = useTheme()
   const router = useRouter()
-  const [favorites, setFavorites] = useState<string[]>([]) 
-  const [isLoaded, setIsLoaded] = useState(false) 
-  const [omniboxQuery, setOmniboxQuery] = useState('') 
+  const [favorites, setFavorites] = useState<string[]>([])
+  const [isLoaded, setIsLoaded] = useState(false)
+  const [omniboxQuery, setOmniboxQuery] = useState('')
 
-  const [recentActivity] = useState({
-    title: 'Ödeme Modülü PRD',
-    time: '2 saat önce',
-    type: 'Requirement',
-    route: '/dashboard/requirement' // Rota düzeltildi
-  })
+  // Gerçek metrikler (getHistory'den türetilir)
+  const [stats, setStats] = useState({ total: 0, thisWeek: 0 })
+  const [recentActivity, setRecentActivity] = useState<{ title: string; time: string; route: string } | null>(null)
 
   useEffect(() => {
     const savedFavs = localStorage.getItem('bai_favorites')
@@ -97,6 +127,21 @@ export default function DashboardPage() {
       setFavorites(JSON.parse(savedFavs))
     }
     setIsLoaded(true)
+
+    getHistory().then((history) => {
+      const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+      const thisWeek = history.filter((h) => new Date(h.created_at).getTime() >= weekAgo).length
+      setStats({ total: history.length, thisWeek })
+
+      const latest = history[0]
+      if (latest) {
+        setRecentActivity({
+          title: latest.module,
+          time: relativeTime(latest.created_at),
+          route: MODULE_ROUTES[latest.module] || '/dashboard/history',
+        })
+      }
+    })
   }, [])
 
   const toggleFavorite = (id: string) => {
@@ -107,7 +152,7 @@ export default function DashboardPage() {
     })
   }
 
-  // OMNIBOX YÖNLENDİRME MANTIĞI (Rotalar /dashboard/ yapısına uygun hale getirildi)
+  // OMNIBOX YÖNLENDİRME MANTIĞI 
   const handleOmniboxSubmit = () => {
     if (!omniboxQuery.trim()) return
 
@@ -117,11 +162,14 @@ export default function DashboardPage() {
     if (query.includes('çiz') || query.includes('şema') || query.includes('akış')) {
       targetRoute = '/dashboard/flowchart'
     } else if (query.includes('sql') || query.includes('sorgu') || query.includes('veri tabanı')) {
-      targetRoute = '/dashboard/sql-generator'
+      targetRoute = '/dashboard/sql'
     } else if (query.includes('test') || query.includes('senaryo') || query.includes('qa')) {
-      targetRoute = '/dashboard/test-case'
+      targetRoute = '/dashboard/testcase'
     } else if (query.includes('risk') || query.includes('tehlike')) {
-      targetRoute = '/dashboard/risk-analyzer'
+      targetRoute = '/dashboard/risk'
+    } else if (query.includes('mimar') || query.includes('atlas') || query.includes('bmad') || query.includes('kapsam')) {
+      // ATLAS YÖNLENDİRMESİ
+      targetRoute = '/dashboard/bmad-studio'
     }
 
     router.push(`${targetRoute}?prompt=${encodeURIComponent(omniboxQuery)}`)
@@ -162,33 +210,34 @@ export default function DashboardPage() {
         
         <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
           
-          {/* Kaldığın Yerden Devam Et Aksiyonu */}
-          <div 
-            onClick={() => router.push(recentActivity.route)}
-            style={{ background: colors.card, border: `1px solid ${colors.border}`, padding: '8px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', transition: 'border 0.2s ease' }}
-            onMouseEnter={(e) => e.currentTarget.style.borderColor = accent}
-            onMouseLeave={(e) => e.currentTarget.style.borderColor = colors.border}
-          >
-            <div style={{ background: `${accent}20`, padding: '8px', borderRadius: '6px', color: accent }}>
-              <Clock size={18} />
-            </div>
-            <div>
-              <div style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '600', marginBottom: '2px' }}>Kaldığın Yerden Devam Et</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <span style={{ fontSize: '13px', color: colors.text, fontWeight: '700' }}>{recentActivity.title}</span>
-                <span style={{ fontSize: '10px', background: `${colors.border}80`, color: colors.textMuted, padding: '2px 6px', borderRadius: '8px' }}>{recentActivity.time}</span>
+          {recentActivity && (
+            <div
+              onClick={() => router.push(recentActivity.route)}
+              style={{ background: colors.card, border: `1px solid ${colors.border}`, padding: '8px 16px', borderRadius: '8px', display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer', transition: 'border 0.2s ease' }}
+              onMouseEnter={(e) => e.currentTarget.style.borderColor = accent}
+              onMouseLeave={(e) => e.currentTarget.style.borderColor = colors.border}
+            >
+              <div style={{ background: `${accent}20`, padding: '8px', borderRadius: '6px', color: accent }}>
+                <Clock size={18} />
+              </div>
+              <div>
+                <div style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '600', marginBottom: '2px' }}>Kaldığın Yerden Devam Et</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ fontSize: '13px', color: colors.text, fontWeight: '700' }}>{recentActivity.title}</span>
+                  <span style={{ fontSize: '10px', background: `${colors.border}80`, color: colors.textMuted, padding: '2px 6px', borderRadius: '8px' }}>{recentActivity.time}</span>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div style={{ background: `${accent}15`, border: `1px solid ${accent}30`, padding: '8px 16px', borderRadius: '8px', textAlign: 'right' }}>
-            <div style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '600' }}>Bu Hafta Tasarruf</div>
-            <div style={{ fontSize: '16px', color: accent, fontWeight: '800' }}>+4 Saat</div>
+            <div style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '600' }}>Bu Hafta Üretilen</div>
+            <div style={{ fontSize: '16px', color: accent, fontWeight: '800' }}>{stats.thisWeek} Adet</div>
           </div>
-          
+
           <div style={{ background: colors.card, border: `1px solid ${colors.border}`, padding: '8px 16px', borderRadius: '8px', textAlign: 'right' }}>
-            <div style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '600' }}>Üretilen Analiz</div>
-            <div style={{ fontSize: '16px', color: colors.text, fontWeight: '800' }}>12 Adet</div>
+            <div style={{ fontSize: '11px', color: colors.textMuted, fontWeight: '600' }}>Toplam Üretilen Analiz</div>
+            <div style={{ fontSize: '16px', color: colors.text, fontWeight: '800' }}>{stats.total} Adet</div>
           </div>
         </div>
       </div>
@@ -215,7 +264,7 @@ export default function DashboardPage() {
           value={omniboxQuery}
           onChange={(e) => setOmniboxQuery(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleOmniboxSubmit()}
-          placeholder="Bugün ne analiz etmek istiyorsun? (Örn: Şifre sıfırlama adımlarını çiz...)"
+          placeholder="Bugün ne analiz etmek istiyorsun? (Örn: Hastane sistemi için BMAD mimarisi oluştur...)"
           style={{ 
             flex: 1, 
             background: 'transparent', 

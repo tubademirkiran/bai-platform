@@ -20,16 +20,27 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      })
 
-    if (error) {
-      setError('Email veya şifre hatalı')
+      if (error) {
+        // Ağ hatası ile gerçek kimlik hatasını ayır
+        if (error.name === 'AuthRetryableFetchError' || /fetch/i.test(error.message)) {
+          setError('Sunucuya ulaşılamıyor. İnternet bağlantınızı / VPN / reklam engelleyiciyi kontrol edin.')
+        } else {
+          setError('Email veya şifre hatalı')
+        }
+        setLoading(false)
+      } else {
+        router.push('/dashboard')
+      }
+    } catch (err) {
+      console.error('Login error:', err)
+      setError('Sunucuya ulaşılamıyor (ağ hatası). Bağlantınızı kontrol edin.')
       setLoading(false)
-    } else {
-      router.push('/dashboard')
     }
   }
 

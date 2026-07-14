@@ -2,27 +2,18 @@
 
 import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
+import { useGenerate } from '@/lib/use-generate'
 
 export default function RiskPage() {
   const { accent, colors } = useTheme()
   const [teamSize, setTeamSize] = useState('')
   const [duration, setDuration] = useState('')
   const [backlogSize, setBacklogSize] = useState('')
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { text: result, loading, error, run } = useGenerate('/api/risk/analyze')
 
   async function handleAnalyze() {
     if (!teamSize || !duration || !backlogSize) return
-    setLoading(true)
-    setResult('')
-    const response = await fetch('/api/risk/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ teamSize, duration, backlogSize }),
-    })
-    const data = await response.json()
-    setResult(data.result)
-    setLoading(false)
+    await run({ teamSize, duration, backlogSize })
   }
 
   const inputStyle = { width: '100%', padding: '8px 12px', borderRadius: '8px', border: `0.5px solid ${colors.border}`, background: colors.bg, color: colors.text, fontSize: '13px', outline: 'none' }
@@ -57,6 +48,12 @@ export default function RiskPage() {
           {loading ? 'AI analiz ediyor...' : 'Riskleri Analiz Et'}
         </button>
       </div>
+
+      {error && (
+        <div style={{ background: '#ef444415', border: '1px solid #ef444455', color: '#ef4444', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px' }}>
+          {error}
+        </div>
+      )}
 
       {result && (
         <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '20px' }}>

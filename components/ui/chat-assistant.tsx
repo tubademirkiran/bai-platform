@@ -26,6 +26,7 @@ export default function ChatAssistant() {
     if (!input.trim() || loading) return
     const userMsg = input.trim()
     setInput('')
+    const historySnapshot = messages
     setMessages(prev => [...prev, { role: 'user', content: userMsg }])
     setLoading(true)
 
@@ -33,10 +34,29 @@ export default function ChatAssistant() {
       const response = await fetch('/api/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userMsg, history: messages }),
+        body: JSON.stringify({ message: userMsg, history: historySnapshot }),
       })
-      const data = await response.json()
-      setMessages(prev => [...prev, { role: 'assistant', content: data.result }])
+
+      if (!response.ok || !response.body) {
+        const data = await response.json().catch(() => null)
+        throw new Error(data?.error || 'İstek başarısız')
+      }
+
+      // Boş bir asistan balonu ekle ve akışı içine yaz.
+      setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+      const reader = response.body.getReader()
+      const decoder = new TextDecoder()
+      let acc = ''
+      while (true) {
+        const { done, value } = await reader.read()
+        if (done) break
+        acc += decoder.decode(value, { stream: true })
+        setMessages(prev => {
+          const next = [...prev]
+          next[next.length - 1] = { role: 'assistant', content: acc }
+          return next
+        })
+      }
     } catch {
       setMessages(prev => [...prev, { role: 'assistant', content: 'Bir hata olustu, tekrar deneyin.' }])
     }

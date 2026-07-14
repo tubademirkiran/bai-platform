@@ -3,25 +3,16 @@
 import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
+import { useGenerate } from '@/lib/use-generate'
 
 export default function TestCasePage() {
   const { accent, colors } = useTheme()
   const [requirement, setRequirement] = useState('')
-  const [result, setResult] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { text: result, loading, error, run } = useGenerate('/api/testcase/generate')
 
   async function handleGenerate() {
     if (!requirement.trim()) return
-    setLoading(true)
-    setResult('')
-    const response = await fetch('/api/testcase/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requirement }),
-    })
-    const data = await response.json()
-    setResult(data.result)
-    setLoading(false)
+    await run({ requirement })
   }
 
   return (
@@ -45,6 +36,12 @@ export default function TestCasePage() {
           {loading ? 'AI uretiyor...' : 'Test Senaryoları Üret'}
         </button>
       </div>
+
+      {error && (
+        <div style={{ background: '#ef444415', border: '1px solid #ef444455', color: '#ef4444', borderRadius: '10px', padding: '12px 16px', marginBottom: '16px', fontSize: '13px' }}>
+          {error}
+        </div>
+      )}
 
       {result && (
         <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '20px' }}>

@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation' // 🌟 YENİ EKLENDİ
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
 
-export default function FlowchartPage() {
+function FlowchartPageInner() {
   const { accent, colors } = useTheme()
   const searchParams = useSearchParams() // 🌟 URL DİNLEYİCİSİ ÇAĞRILDI
 
@@ -275,5 +275,14 @@ export default function FlowchartPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+// useSearchParams() Next 16'da Suspense sınırı gerektirir (statik üretim uyumu).
+export default function FlowchartPage() {
+  return (
+    <Suspense fallback={null}>
+      <FlowchartPageInner />
+    </Suspense>
   )
 }
