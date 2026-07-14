@@ -39,3 +39,6 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# İç içe eski prototip (untrack edildi)
+/bai-platform/
