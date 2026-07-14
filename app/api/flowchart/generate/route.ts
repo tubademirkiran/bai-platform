@@ -1,10 +1,18 @@
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-
 import { NextRequest, NextResponse } from 'next/server'
+import { guard } from '@/lib/api-guard'
+import { callGroq, GroqError } from '@/lib/groq'
+import { saveHistoryServer } from '@/lib/history-server'
 
 export async function POST(req: NextRequest) {
+  const gate = await guard('flowchart')
+  if (gate.error) return gate.error
+
   try {
     const { requirement, diagramType } = await req.json()
+
+    if (!requirement || typeof requirement !== 'string' || !requirement.trim()) {
+      return NextResponse.json({ error: 'Gereksinim alanı boş olamaz.' }, { status: 400 })
+    }
 
     const prompts: Record<string, string> = {
       flowchart: `You are a software architect. Convert the following requirement into a Mermaid.js FLOWCHART diagram.
@@ -44,37 +52,20 @@ Rules:
 Requirement: ${requirement}`,
     }
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompts[diagramType] || prompts.flowchart }],
-        max_tokens: 1000,
-        temperature: 0.2,
-      }),
+    const raw = await callGroq({
+      user: prompts[diagramType] || prompts.flowchart,
+      maxTokens: 1000,
+      temperature: 0.2,
     })
 
-    const data = await response.json()
-
-    if (!response.ok) {
-      return NextResponse.json({ error: data.error?.message }, { status: 500 })
-    }
-
-    let result = data.choices[0].message.content
-
-    result = result
-      .replace(/```mermaid/g, '')
-      .replace(/```/g, '')
-      .trim()
-
+    const result = raw.replace(/```mermaid/g, '').replace(/```/g, '').trim()
+    await saveHistoryServer('Flowchart', `${diagramType || 'flowchart'}: ${requirement}`, result)
     return NextResponse.json({ result })
-
   } catch (error) {
+    if (error instanceof GroqError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
     console.error('Flowchart error:', error)
-    return NextResponse.json({ error: 'Sunucu hatasi' }, { status: 500 })
+    return NextResponse.json({ error: 'Sunucu hatası oluştu.' }, { status: 500 })
   }
 }

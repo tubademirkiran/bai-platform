@@ -1,23 +1,23 @@
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-
 import { NextRequest, NextResponse } from 'next/server'
+import { guard } from '@/lib/api-guard'
+import { streamGroq, captureStream, GroqError } from '@/lib/groq'
+import { saveHistoryServer } from '@/lib/history-server'
 
 export async function POST(req: NextRequest) {
+  const gate = await guard('risk')
+  if (gate.error) return gate.error
+
   try {
     const { teamSize, duration, backlogSize } = await req.json()
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          {
-            role: 'user',
-            content: `You are a senior project manager. Analyze the risks of the following project and provide a mitigation plan in Turkish.
+    if (!teamSize || !duration || !backlogSize) {
+      return NextResponse.json(
+        { error: 'Ekip büyüklüğü, süre ve backlog sayısı zorunludur.' },
+        { status: 400 }
+      )
+    }
+
+    const prompt = `You are a senior project manager. Analyze the risks of the following project and provide a mitigation plan in Turkish.
 
 Project details:
 - Team size: ${teamSize} people
@@ -29,23 +29,23 @@ Provide:
 2. TOP 5 RISKS with probability and impact
 3. MITIGATION STRATEGIES for each risk
 4. OVERALL RECOMMENDATION`
-          }
-        ],
-        max_tokens: 1000,
-      }),
+
+    const stream = await streamGroq({ user: prompt, maxTokens: 1000 })
+    const captured = captureStream(stream, (full) =>
+      saveHistoryServer(
+        'Risk Analyzer',
+        `Ekip: ${teamSize} kişi | Süre: ${duration} hafta | Backlog: ${backlogSize} görev`,
+        full
+      )
+    )
+    return new Response(captured, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
     })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      return NextResponse.json({ error: data.error?.message }, { status: 500 })
-    }
-
-    const result = data.choices[0].message.content
-    return NextResponse.json({ result })
-
   } catch (error) {
-    console.error('Server error:', error)
-    return NextResponse.json({ error: 'Sunucu hatasi' }, { status: 500 })
+    if (error instanceof GroqError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    console.error('Risk error:', error)
+    return NextResponse.json({ error: 'Sunucu hatası oluştu.' }, { status: 500 })
   }
 }

@@ -1,12 +1,20 @@
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-
 import { NextRequest, NextResponse } from 'next/server'
+import { guard } from '@/lib/api-guard'
+import { callGroqJSON, GroqError } from '@/lib/groq'
+import { saveHistoryServer } from '@/lib/history-server'
 
 export async function POST(req: NextRequest) {
+  const gate = await guard('persona')
+  if (gate.error) return gate.error
+
   try {
     const { product, audience, count, lang } = await req.json()
 
-    const prompt = `You are an Expert UX Researcher and Senior Business Analyst. 
+    if (!product || typeof product !== 'string' || !product.trim()) {
+      return NextResponse.json({ error: 'Ürün/modül açıklaması boş olamaz.' }, { status: 400 })
+    }
+
+    const prompt = `You are an Expert UX Researcher and Senior Business Analyst.
     Your task is to generate realistic user personas based on the product description provided.
 
     Product/Module to be built: ${product}
@@ -36,31 +44,14 @@ export async function POST(req: NextRequest) {
     - Make the personas realistic and distinct from each other.
     - The golden_advice should be highly actionable (e.g., 'Since they are tech-illiterate, use large buttons and avoid nested menus').`
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 4000,
-        temperature: 0.7,
-      }),
-    })
-
-    const data = await response.json()
-    if (!response.ok) return NextResponse.json({ error: data.error?.message }, { status: 500 })
-
-    let text = data.choices[0].message.content
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim()
-
-    const result = JSON.parse(text)
+    const result = await callGroqJSON({ user: prompt, maxTokens: 4000, temperature: 0.7 })
+    await saveHistoryServer('Persona', product, JSON.stringify(result))
     return NextResponse.json({ result })
-
   } catch (error) {
+    if (error instanceof GroqError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
     console.error('Persona Generator error:', error)
-    return NextResponse.json({ error: 'Sunucu hatasi' }, { status: 500 })
+    return NextResponse.json({ error: 'Sunucu hatası oluştu.' }, { status: 500 })
   }
 }

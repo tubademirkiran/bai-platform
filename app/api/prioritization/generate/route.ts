@@ -1,11 +1,18 @@
-// app/api/prioritization/generate/route.ts
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-
 import { NextRequest, NextResponse } from 'next/server'
+import { guard } from '@/lib/api-guard'
+import { callGroqJSON, GroqError } from '@/lib/groq'
+import { saveHistoryServer } from '@/lib/history-server'
 
 export async function POST(req: NextRequest) {
+  const gate = await guard('prioritization')
+  if (gate.error) return gate.error
+
   try {
     const { goal, requirements, method, lang } = await req.json()
+
+    if (!requirements || typeof requirements !== 'string' || !requirements.trim()) {
+      return NextResponse.json({ error: 'Gereksinim listesi boş olamaz.' }, { status: 400 })
+    }
 
     // Metodolojiye göre JSON formatı ve kuralları belirliyoruz
     let methodRules = ''
@@ -39,16 +46,16 @@ export async function POST(req: NextRequest) {
 
     const prompt = `You are an expert Agile Coach and Senior Product Manager.
     Your task is to prioritize a list of requirements based on the chosen methodology.
-    
+
     Context / Business Goal: ${goal || 'General product improvement'}
     Methodology: ${method}
     Language: ${lang === 'tr' ? 'Turkish' : lang === 'de' ? 'German' : 'English'}
-    
+
     Requirements List:
     ${requirements}
-    
+
     ${methodRules}
-    
+
     Return a valid JSON with this EXACT structure:
     {
       "summary": "A 2-3 sentence overall coach advice about this backlog considering the main goal.",
@@ -56,48 +63,35 @@ export async function POST(req: NextRequest) {
         {
           "id": "1",
           "requirement": "The requirement text",
-          "coach_advice": "1 short sentence of strong PO advice/defense for this item",
-          // ... include the methodology specific keys defined above here
+          "coach_advice": "1 short sentence of strong PO advice/defense for this item"
         }
       ]
     }
-    
+
     Rules:
     - Return ONLY the JSON, no markdown backticks, no extra text.
     - Be realistic with your scores. Do not give everything high priority.
-    - The "coach_advice" must be practical, direct, and written in ${lang === 'tr' ? 'Turkish' : 'English'}.`
+    - The "coach_advice" must be practical, direct, and written in ${lang === 'tr' ? 'Turkish' : 'English'}.
+    - Include the methodology specific keys defined above inside each item.`
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 3000,
-        temperature: 0.3,
-      }),
+    const result = await callGroqJSON<{ items?: { score?: number }[] }>({
+      user: prompt,
+      maxTokens: 3000,
+      temperature: 0.3,
     })
 
-    const data = await response.json()
-    if (!response.ok) return NextResponse.json({ error: data.error?.message }, { status: 500 })
-
-    let text = data.choices[0].message.content
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim()
-
-    const result = JSON.parse(text)
-    
     // RICE skoruna göre sıralama (eğer RICE seçilmişse)
-    if (method === 'rice' && result.items) {
-      result.items.sort((a: any, b: any) => b.score - a.score)
+    if (method === 'rice' && Array.isArray(result.items)) {
+      result.items.sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
     }
 
+    await saveHistoryServer('Prioritization', `[${method}] ${requirements}`, JSON.stringify(result))
     return NextResponse.json({ result })
-
   } catch (error) {
+    if (error instanceof GroqError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
     console.error('Prioritization error:', error)
-    return NextResponse.json({ error: 'Sunucu hatasi' }, { status: 500 })
+    return NextResponse.json({ error: 'Sunucu hatası oluştu.' }, { status: 500 })
   }
 }

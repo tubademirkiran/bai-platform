@@ -1,170 +1,73 @@
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-
 import { NextRequest, NextResponse } from 'next/server'
+import { guard } from '@/lib/api-guard'
+import { streamGroq, captureStream, GroqError } from '@/lib/groq'
+import { saveHistoryServer } from '@/lib/history-server'
 
-export async function POST(req: NextRequest) {
-  try {
-    // Arayüzden gelen tüm verileri alıyoruz
-    const { project, issueType, squad, owner, requirement } = await req.json()
+const SYSTEM_PROMPT = `Sen kıdemli bir QA Mühendisi ve Test Analistisin.
 
-    const response = await fetch('[https://api.groq.com/openai/v1/chat/completions](https://api.groq.com/openai/v1/chat/completions)', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          {
-            role: 'system',
-            content: `Sen kıdemli bir Business Analyst, Product Owner ve Scrum Master'sın.
-
-Görevin, verilen gereksinimi analiz ederek profesyonel Jira çıktıları oluşturmaktır.
+Görevin: verilen gereksinimi analiz ederek eksiksiz, profesyonel test senaryoları üretmek.
 
 KURALLAR:
-* Yalnızca verilen gereksinimi kullan.
-* Özellik uydurma.
-* Türkçe karakterleri doğru kullan.
-* Agile ve Scrum prensiplerine uygun yaz.
-* Jira'da doğrudan kullanılabilecek içerik üret.
-* Gereksinimi mantıksal iş parçalarına böl.
-* Her çıktı açık, ölçülebilir ve uygulanabilir olsun.
-* Acceptance Criteria'lar test edilebilir olmalıdır.
-* Gereksinim eksikse bunu belirt.
+- TÜM çıktıyı Türkçe yaz ve Türkçe karakterleri (ç, ğ, ı, ö, ş, ü) doğru kullan.
+- Yalnızca verilen gereksinime dayan; özellik uydurma. Eksik bilgi varsa "Belirtilmedi" yaz.
+- Pozitif, negatif ve sınır (edge-case) senaryolarını mutlaka kapsa.
+- Her test senaryosu net, ölçülebilir ve tekrar edilebilir olmalı.`
 
-Önceliklendirme Kuralları:
-P0 = Kritik iş etkisi
-P1 = Yüksek öncelik
-P2 = Normal öncelik
-P3 = Düşük öncelik`.trim(),
-          },
-          {
-            role: 'user',
-            content: `Aşağıdaki gereksinimi analiz et:
+export async function POST(req: NextRequest) {
+  const gate = await guard('testcase')
+  if (gate.error) return gate.error
 
-[PROJE BAĞLAMI]
-Proje: ${project}
-İş Tipi: ${issueType}
-Takım (Squad): ${squad}
-İş Sahipliği: ${owner}
+  try {
+    const { requirement } = await req.json()
+
+    if (!requirement || typeof requirement !== 'string' || !requirement.trim()) {
+      return NextResponse.json({ error: 'Gereksinim alanı boş olamaz.' }, { status: 400 })
+    }
+
+    const userPrompt = `Aşağıdaki gereksinim için kapsamlı test senaryoları üret:
 
 [GEREKSİNİM]
 ${requirement}
 
-Aşağıdaki formatta çıktı üret:
+Çıktıyı aşağıdaki yapıda, Markdown formatında üret:
 
-=========================================
-1. İŞ ANALİZİ ÖZETİ
-=========================================
-* Gereksinimin amacı
-* İş değeri
-* Kullanıcıya etkisi
+## 1. Test Özeti
+- Test edilecek özelliğin kısa açıklaması ve test kapsamı.
 
-=========================================
-2. EPIC
-=======
-* Epic Başlığı
-* Epic Açıklaması
-* İş Hedefi
+## 2. Ön Koşullar (Preconditions)
+- Testin çalışması için gereken hazırlıklar / veriler.
 
-=========================================
-3. USER STORYLER
-================
-Her User Story için:
+## 3. Test Senaryoları
+Her senaryoyu şu tablo formatında listele:
 
-User Story ID:
-Başlık:
+| ID | Senaryo | Tip (Pozitif/Negatif/Sınır) | Adımlar | Beklenen Sonuç |
+| --- | ------- | --------------------------- | ------- | -------------- |
 
-As a [rol]
-I want [istek]
-So that [iş değeri]
+- En az 6-8 senaryo üret: happy path, hatalı girdi, yetki/güvenlik, sınır değer ve iptal/rollback senaryolarını kapsa.
 
-Açıklama:
-Öncelik:
-Story Point Tahmini:
+## 4. Gherkin Kabul Kriterleri
+En kritik 2-3 senaryo için Given / When / Then formatında yaz.
 
-Acceptance Criteria:
-* ...
+## 5. Kenar Durumlar ve Riskler
+- Gözden kaçabilecek uç durumlar ve dikkat edilmesi gerekenler.`
 
-Bağımlılıklar:
-* ...
-
-=========================================
-4. TASKLAR
-==========
-Her Task için:
-* Başlık
-* Açıklama
-* Öncelik
-* Tahmini Efor
-* Bağlı Olduğu User Story
-
-=========================================
-5. SUB-TASKLAR
-==============
-Her Task için gerekli alt işler.
-
-=========================================
-6. ACCEPTANCE CRITERIA
-======================
-Gherkin formatında yaz:
-Given ...
-When ...
-Then ...
-
-=========================================
-7. TEKNİK ANALİZ
-================
-* Backend etkileri
-* Frontend etkileri
-* Veritabanı etkileri
-* Entegrasyon etkileri
-* Güvenlik gereksinimleri
-
-=========================================
-8. RİSKLER
-==========
-* Risk
-* Etki Seviyesi (High / Medium / Low)
-* Önerilen Aksiyon
-
-=========================================
-9. RELEASE NOTLARI
-==================
-Son kullanıcıya yönelik kısa release note oluştur.
-
-=========================================
-10. JIRA IMPORT HAZIR ÖZET
-==========================
-| Tür | Başlık | Öncelik | Bağlı Kayıt |
-| --- | ------ | ------- | ----------- |
-
-Çıktının tamamını Türkçe üret.`.trim(),
-          },
-        ],
-        temperature: 0.1,
-        max_tokens: 4000, // Çıktı çok uzun olacağı için token limitini yüksek tutmalıyız
-      }),
+    const stream = await streamGroq({
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userPrompt },
+      ],
+      temperature: 0.15,
+      maxTokens: 4000,
     })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      return NextResponse.json(
-        { error: data?.error?.message || 'API error' },
-        { status: 500 }
-      )
-    }
-
-    const result = data?.choices?.[0]?.message?.content || ''
-
-    return NextResponse.json({ result })
+    const captured = captureStream(stream, (full) => saveHistoryServer('Test Case', requirement, full))
+    return new Response(captured, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
+    })
   } catch (error) {
-    console.error('Server error:', error)
-    return NextResponse.json(
-      { error: 'Sunucu hatası' },
-      { status: 500 }
-    )
+    if (error instanceof GroqError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    console.error('TestCase error:', error)
+    return NextResponse.json({ error: 'Sunucu hatası oluştu.' }, { status: 500 })
   }
 }

@@ -1,10 +1,18 @@
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0'
-
 import { NextRequest, NextResponse } from 'next/server'
+import { guard } from '@/lib/api-guard'
+import { callGroqJSON, GroqError } from '@/lib/groq'
+import { saveHistoryServer } from '@/lib/history-server'
 
 export async function POST(req: NextRequest) {
+  const gate = await guard('wireframe')
+  if (gate.error) return gate.error
+
   try {
     const { requirement, platform, style, lang } = await req.json()
+
+    if (!requirement || typeof requirement !== 'string' || !requirement.trim()) {
+      return NextResponse.json({ error: 'Gereksinim alanı boş olamaz.' }, { status: 400 })
+    }
 
     const styleGuide = {
       wireframe: 'Black and white wireframe style. Use only borders, no colors. Gray backgrounds only. Simple placeholder boxes.',
@@ -43,31 +51,14 @@ Rules for htmlCode:
 - Language of all labels: ${lang === 'tr' ? 'Turkish' : lang === 'de' ? 'German' : 'English'}
 - Return ONLY the JSON, no markdown backticks`
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 4000,
-        temperature: 0.2,
-      }),
-    })
-
-    const data = await response.json()
-    if (!response.ok) return NextResponse.json({ error: data.error?.message }, { status: 500 })
-
-    let text = data.choices[0].message.content
-    text = text.replace(/```json/g, '').replace(/```/g, '').trim()
-
-    const result = JSON.parse(text)
+    const result = await callGroqJSON({ user: prompt, maxTokens: 4000, temperature: 0.2 })
+    await saveHistoryServer('Wireframe', requirement, JSON.stringify(result))
     return NextResponse.json({ result })
-
   } catch (error) {
+    if (error instanceof GroqError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
     console.error('Wireframe error:', error)
-    return NextResponse.json({ error: 'Sunucu hatasi' }, { status: 500 })
+    return NextResponse.json({ error: 'Sunucu hatası oluştu.' }, { status: 500 })
   }
 }

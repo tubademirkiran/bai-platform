@@ -1,12 +1,16 @@
-process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0' // Not: Lokal/Proxy testleri içindir. Canlı ortamda güvenlik nedeniyle kaldırılmalıdır.
-
 import { NextRequest, NextResponse } from 'next/server'
+import { guard } from '@/lib/api-guard'
+import { streamGroq, captureStream, GroqError } from '@/lib/groq'
+import { saveHistoryServer } from '@/lib/history-server'
 
 export async function POST(req: NextRequest) {
+  const gate = await guard('requirement')
+  if (gate.error) return gate.error
+
   try {
     const { idea, lang = 'tr' } = await req.json()
 
-    if (!idea || idea.trim() === '') {
+    if (!idea || typeof idea !== 'string' || idea.trim() === '') {
       return NextResponse.json({ error: 'Fikir alanı boş olamaz.' }, { status: 400 })
     }
 
@@ -15,11 +19,10 @@ export async function POST(req: NextRequest) {
       en: 'English',
       de: 'German',
     }
-
     const language = langMap[lang] || 'Turkish'
 
     // 1. SYSTEM PROMPT: Modelin iş analisti kimliğini keskinleştiriyoruz ve kısırdöngü üretmesini yasaklıyoruz.
-    const systemPrompt = `You are a Senior Enterprise Business Analyst certified in IIBA BABOK v3 (Business Analysis Body of Knowledge) and specialized in Agile/Scrum methodologies. 
+    const systemPrompt = `You are a Senior Enterprise Business Analyst certified in IIBA BABOK v3 (Business Analysis Body of Knowledge) and specialized in Agile/Scrum methodologies.
 Your objective is to transform raw, short business ideas into an enterprise-grade, development-ready Product Requirement Document (PRD).
 
 CRITICAL ANTI-TAUTOLOGY & REALISM RULES:
@@ -28,7 +31,7 @@ CRITICAL ANTI-TAUTOLOGY & REALISM RULES:
 3. Avoid vague or subjective terms (e.g., "fast", "user-friendly", "secure enough"). Use deterministic, measurable, and highly technical software engineering terms.
 4. Extrapolate missing requirements logically based on enterprise best practices. Do not just repeat the user's brief input over and over.
 
-CRITICAL ENCODING & LANGUAGE RULE: 
+CRITICAL ENCODING & LANGUAGE RULE:
 The entire generated document MUST be written in ${language}. Ensure proper character encoding. Translate all Markdown section headers into ${language} as well.`
 
     // 2. USER PROMPT: Yapay zekayı 4 adet hikaye üretmeye zorlayan ve mimariyi derinleştiren ultra detaylı şablon.
@@ -112,41 +115,22 @@ REQUIRED MARKDOWN TEMPLATE (Translate headers and entire content into ${language
 ### 7.3. Veri Göçü ve Ön Koşullar (Data Migration & Prerequisites)
 - (Bu özelliğin çalışabilmesi için sistemde halihazırda göç ettirilmiş [migrated] veya tanımlanmış olması gereken statik veriler)`
 
-    // Groq API isteği gönderiliyor
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: userPrompt
-          }
-        ],
-        temperature: 0.15, // Sıcaklığı düşük tutarak tamamen deterministik ve rasyonel kalmasını sağlıyoruz.
-        max_tokens: 4000,  // Kapsamı büyüyen dökümanın yarıda kesilmemesi için token tavanı 4000'e çıkarıldı.
-      }),
+    const stream = await streamGroq({
+      system: systemPrompt,
+      user: userPrompt,
+      temperature: 0.15,
+      maxTokens: 4000,
     })
-
-    const data = await response.json()
-
-    if (!response.ok) {
-      return NextResponse.json({ error: data.error?.message || 'Groq API hatası' }, { status: response.status })
-    }
-
-    const result = data.choices[0].message.content
-    return NextResponse.json({ result })
-
+    // Akış bitince tam metni geçmişe kaydet.
+    const captured = captureStream(stream, (full) => saveHistoryServer('Requirement', idea, full))
+    return new Response(captured, {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' },
+    })
   } catch (error) {
-    console.error('Server error:', error)
-    return NextResponse.json({ error: 'Sunucu hatası oluştu' }, { status: 500 })
+    if (error instanceof GroqError) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+    console.error('Requirement error:', error)
+    return NextResponse.json({ error: 'Sunucu hatası oluştu.' }, { status: 500 })
   }
 }
