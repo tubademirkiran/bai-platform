@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/ui/empty-state'
+import { PageHeader } from '@/components/ui/page-header'
+import { CopyButton } from '@/components/ui/copy-button'
 import { Loader2, Users } from 'lucide-react'
 
 type TechLevel = 'Düşük' | 'Orta' | 'Yüksek' | 'Low' | 'Medium' | 'High'
@@ -27,7 +29,6 @@ export default function PersonaPage() {
   const [count, setCount] = useState<1 | 2 | 3>(2)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<{ personas: Persona[] } | null>(null)
-  const [copied, setCopied] = useState(false)
 
   async function handleGenerate() {
     if (!product.trim()) return
@@ -49,46 +50,34 @@ export default function PersonaPage() {
     }
   }
 
-  const handleCopyExport = () => {
-    if (!result) return
+  // Görev (a): Kopyalama metnini üreten fonksiyon CopyButton'a göre uyarlandı
+  const getMarkdownContent = () => {
+    if (!result) return ''
     let text = `# HEDEF KİTLE PERSONA ANALİZİ\n\n**Ürün/Modül:** ${product}\n\n---\n\n`
     
     result.personas.forEach((p, idx) => {
       text += `## ${p.avatar} Persona ${idx + 1}: ${p.name} (${p.age} - ${p.role})\n`
       text += `- **Teknoloji Yatkınlığı:** ${p.tech_level}\n`
       text += `- **Biyografi:** ${p.bio}\n\n`
-      text += `### 🎯 Hedefler & Motivasyonlar\n`
+      text += `### Hedefler & Motivasyonlar\n`
       p.goals.forEach(g => text += `- ${g}\n`)
-      text += `\n### 💔 Acı Noktaları (Pain Points)\n`
+      text += `\n### Acı Noktaları (Pain Points)\n`
       p.pain_points.forEach(pp => text += `- ${pp}\n`)
-      text += `\n### 💡 Tasarım / Analiz Tavsiyesi\n> ${p.golden_advice}\n\n---\n\n`
+      text += `\n### Tasarım / Analiz Tavsiyesi\n> ${p.golden_advice}\n\n---\n\n`
     })
 
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  const btnStyle = {
-    padding: '6px 12px', borderRadius: '8px',
-    border: `0.5px solid ${colors.border}`,
-    background: colors.card, color: colors.text,
-    fontSize: '11px', fontWeight: '600' as const, cursor: 'pointer',
+    return text
   }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-      <div style={{ marginBottom: '20px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: '800', color: colors.text, margin: 0 }}>
-            {lang === 'tr' ? 'Persona Generator' : 'Persona Generator'}
-          </h2>
-          <span style={{ fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '20px', background: accent + '22', color: accent }}>PO/BA/UX</span>
-        </div>
-        <p style={{ fontSize: '13px', color: colors.textMuted, margin: 0 }}>
-          {lang === 'tr' ? 'Gereksinimleriniz için hedef kitle profilleri ve UX tavsiyeleri üretin.' : 'Generate target audience profiles and UX advice for your requirements.'}
-        </p>
-      </div>
+      
+      {/* Görev (a): PageHeader Eklendi */}
+      <PageHeader 
+        title="Persona Generator" 
+        description={lang === 'tr' ? 'Gereksinimleriniz için hedef kitle profilleri ve UX tavsiyeleri üretin.' : 'Generate target audience profiles and UX advice for your requirements.'} 
+        icon={Users} 
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '340px minmax(0, 1fr)', gap: '16px', alignItems: 'start', flex: 1, minHeight: 0 }}>
         
@@ -130,12 +119,13 @@ export default function PersonaPage() {
               ))}
             </div>
 
+            {/* Görev (a): Buton içindeki emojiler temizlendi */}
             <button
               onClick={handleGenerate}
               disabled={loading || !product.trim()}
               style={{ width: '100%', padding: '11px', borderRadius: '8px', border: 'none', background: !product.trim() ? colors.border : accent, color: '#fff', fontWeight: '700', fontSize: '13px', cursor: (loading || !product.trim()) ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
             >
-              {loading ? (lang === 'tr' ? '🎭 Personalar Üretiliyor...' : '🎭 Generating Personas...') : (lang === 'tr' ? '🎭 Personaları Yarat' : '🎭 Generate Personas')}
+              {loading ? (lang === 'tr' ? 'Personalar Üretiliyor...' : 'Generating Personas...') : (lang === 'tr' ? 'Personaları Yarat' : 'Generate Personas')}
             </button>
           </div>
         </div>
@@ -163,10 +153,13 @@ export default function PersonaPage() {
 
           {result && !loading && (
             <>
+              {/* Görev (a): CopyButton bileşeni eklendi */}
               <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px' }}>
-                 <button onClick={handleCopyExport} style={{ ...btnStyle, color: copied ? '#10b981' : colors.text, borderColor: copied ? '#10b981' : colors.border, display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {copied ? '✅ Kopyalandı' : '📋 Jira / Markdown Kopyala'}
-                </button>
+                <CopyButton 
+                  getText={getMarkdownContent} 
+                  label={lang === 'tr' ? 'Jira / Markdown Kopyala' : 'Copy Markdown'} 
+                  copiedLabel={lang === 'tr' ? 'Kopyalandı' : 'Copied'} 
+                />
               </div>
 
               <div style={{ display: 'grid', gridTemplateColumns: result.personas.length > 1 ? 'repeat(2, 1fr)' : '1fr', gap: '16px' }}>
@@ -188,10 +181,11 @@ export default function PersonaPage() {
                       
                       {/* Tech Level & Bio */}
                       <div>
+                        {/* Görev (a): Emojiler temizlendi */}
                         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
                           <span style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted, letterSpacing: '0.05em' }}>BİYOGRAFİ</span>
                           <span style={{ fontSize: '10px', fontWeight: '700', padding: '2px 8px', borderRadius: '12px', background: colors.bg, border: `1px solid ${colors.border}`, color: colors.text }}>
-                            💻 Teknoloji: <span style={{ color: persona.tech_level.includes('Low') || persona.tech_level.includes('Düşük') ? '#ef4444' : persona.tech_level.includes('High') || persona.tech_level.includes('Yüksek') ? '#10b981' : '#f59e0b' }}>{persona.tech_level}</span>
+                            Teknoloji: <span style={{ color: persona.tech_level.includes('Low') || persona.tech_level.includes('Düşük') ? '#ef4444' : persona.tech_level.includes('High') || persona.tech_level.includes('Yüksek') ? '#10b981' : '#f59e0b' }}>{persona.tech_level}</span>
                           </span>
                         </div>
                         <p style={{ fontSize: '12px', color: colors.text, lineHeight: '1.6', margin: 0, fontStyle: 'italic' }}>"{persona.bio}"</p>
@@ -200,14 +194,14 @@ export default function PersonaPage() {
                       {/* Goals & Pain Points */}
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '16px' }}>
                         <div style={{ background: isDark ? 'rgba(16, 185, 129, 0.05)' : '#ecfdf5', padding: '12px', borderRadius: '8px', border: `1px solid ${isDark ? 'rgba(16, 185, 129, 0.1)' : '#d1fae5'}` }}>
-                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#10b981', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>🎯 HEDEFLER & MOTİVASYON</div>
+                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#10b981', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>HEDEFLER & MOTİVASYON</div>
                           <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '12px', color: colors.text, lineHeight: '1.5' }}>
                             {persona.goals.map((g, i) => <li key={i} style={{ marginBottom: '4px' }}>{g}</li>)}
                           </ul>
                         </div>
 
                         <div style={{ background: isDark ? 'rgba(239, 68, 68, 0.05)' : '#fef2f2', padding: '12px', borderRadius: '8px', border: `1px solid ${isDark ? 'rgba(239, 68, 68, 0.1)' : '#fee2e2'}` }}>
-                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#ef4444', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>💔 ACI NOKTALARI (FRUSTRATIONS)</div>
+                          <div style={{ fontSize: '11px', fontWeight: '700', color: '#ef4444', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '4px' }}>ACI NOKTALARI (FRUSTRATIONS)</div>
                           <ul style={{ margin: 0, paddingLeft: '16px', fontSize: '12px', color: colors.text, lineHeight: '1.5' }}>
                             {persona.pain_points.map((p, i) => <li key={i} style={{ marginBottom: '4px' }}>{p}</li>)}
                           </ul>
@@ -216,7 +210,7 @@ export default function PersonaPage() {
 
                       {/* Golden Advice */}
                       <div style={{ background: accent + '11', padding: '16px', borderRadius: '8px', borderLeft: `3px solid ${accent}` }}>
-                        <div style={{ fontSize: '11px', fontWeight: '800', color: accent, marginBottom: '6px', letterSpacing: '0.05em' }}>💡 TASARIM & ANALİZ TAVSİYESİ</div>
+                        <div style={{ fontSize: '11px', fontWeight: '800', color: accent, marginBottom: '6px', letterSpacing: '0.05em' }}>TASARIM & ANALİZ TAVSİYESİ</div>
                         <div style={{ fontSize: '12px', color: colors.text, lineHeight: '1.6', fontWeight: '500' }}>
                           {persona.golden_advice}
                         </div>

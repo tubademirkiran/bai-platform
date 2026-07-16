@@ -4,8 +4,8 @@ import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/ui/page-header'
-import { Target, Clock, Users, AlertTriangle, Building2, Check, type LucideIcon } from 'lucide-react'
-// Geçmişe kayıt server tarafında (API route) yapılıyor.
+import { CopyButton } from '@/components/ui/copy-button'
+import { Target, Clock, Users, AlertTriangle, Building2, Check, type LucideIcon, Briefcase } from 'lucide-react'
 
 type Methodology = 'waterfall' | 'agile' | 'hybrid'
 type Tab = 'scope' | 'schedule' | 'stakeholders' | 'risks'
@@ -38,12 +38,50 @@ export default function PMIPlannerPage() {
       })
       const data = await response.json()
       setResult(data.result)
-      // Geçmişe kayıt server tarafında yapılıyor.
     } catch (error) {
       console.error(error)
     } finally {
       setLoading(false)
     }
+  }
+
+  // Tüm PMI çıktısını Jira/Confluence için kopyalanabilir hale getiren formatter
+  const getFullMarkdown = () => {
+    if (!result) return ''
+    
+    let md = `# PMI PROJECT PLAN: ${form.projectName.toUpperCase()}\n\n`
+    
+    md += `## 1. SCOPE & WBS\n`
+    md += `**In-Scope:** ${result.scope.in.join(', ')}\n`
+    md += `**Out-of-Scope:** ${result.scope.out.join(', ')}\n\n`
+    md += `### WBS (Work Breakdown Structure)\n`
+    result.scope.wbs.forEach((node: any) => {
+      md += `- **${node.phase}**\n`
+      node.tasks.forEach((t: string) => md += `  - ${t}\n`)
+    })
+    
+    md += `\n## 2. SCHEDULE & BUDGET\n`
+    md += `### Milestones\n`
+    result.schedule.milestones.forEach((m: any) => md += `- ${m.date}: ${m.event}\n`)
+    md += `\n### Budget Breakdown\n`
+    result.schedule.budget_breakdown.forEach((b: any) => md += `- ${b.category}: %${b.percent}\n`)
+
+    md += `\n## 3. STAKEHOLDERS (RACI)\n`
+    result.stakeholders.raci.forEach((row: any) => {
+      md += `- **${row.task}:** `
+      const assignments = row.assignments.map((a: string, i: number) => {
+        const role = result.stakeholders.roles[i]
+        return a !== '-' ? `${role} (${a})` : null
+      }).filter(Boolean)
+      md += `${assignments.join(', ')}\n`
+    })
+
+    md += `\n## 4. RISKS & QUALITY\n`
+    result.risks.items.forEach((r: any) => md += `- ⚠️ **${r.risk}**\n  - *Mitigation:* ${r.mitigation}\n`)
+    md += `\n### Acceptance Criteria\n`
+    result.risks.acceptance.forEach((a: string) => md += `- [ ] ${a}\n`)
+
+    return md
   }
 
   const inputStyle = {
@@ -61,10 +99,12 @@ export default function PMIPlannerPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      
+      {/* Görev (a): PageHeader düzeltildi ve Briefcase ikonu eklendi */}
       <PageHeader
         title={lang === 'tr' ? 'PMI Proje Planlama Sihirbazı' : 'PMI Project Planning Wizard'}
-        badge="PMBOK v7"
-        desc={lang === 'tr' ? 'Uluslararası standartlarda (PMI) proje başlatma belgesi ve master plan üretin.' : 'Generate project charter and master plan based on PMI standards.'}
+        description={lang === 'tr' ? 'Uluslararası standartlarda (PMI) proje başlatma belgesi ve master plan üretin.' : 'Generate project charter and master plan based on PMI standards.'}
+        icon={Briefcase}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '16px', alignItems: 'start' }}>
@@ -117,7 +157,7 @@ export default function PMIPlannerPage() {
           <button
             onClick={handleGenerate}
             disabled={loading || !form.projectName}
-            style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', background: accent, color: '#fff', fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer' }}
+            style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', background: !form.projectName ? colors.border : accent, color: '#fff', fontWeight: '700', cursor: (loading || !form.projectName) ? 'not-allowed' : 'pointer' }}
           >
             {loading ? 'Plan Hazırlanıyor...' : 'Projeyi Planla'}
           </button>
@@ -127,22 +167,31 @@ export default function PMIPlannerPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           {result ? (
             <>
-              {/* Tab Nav */}
-              <div style={{ display: 'flex', gap: '4px', background: colors.card, padding: '4px', borderRadius: '10px', border: `1px solid ${colors.border}` }}>
-                {tabs.map(tab => (
-                  <button
-                    key={tab.key}
-                    onClick={() => setActiveTab(tab.key as Tab)}
-                    style={{
-                      flex: 1, padding: '10px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
-                      background: activeTab === tab.key ? accent : 'transparent',
-                      color: activeTab === tab.key ? '#fff' : colors.textMuted,
-                      transition: 'all 0.2s'
-                    }}
-                  >
-                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}><tab.icon size={14} /> {tab.label}</span>
-                  </button>
-                ))}
+              {/* Tab Nav ve CopyButton Yanyana */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ display: 'flex', gap: '4px', background: colors.card, padding: '4px', borderRadius: '10px', border: `1px solid ${colors.border}` }}>
+                  {tabs.map(tab => (
+                    <button
+                      key={tab.key}
+                      onClick={() => setActiveTab(tab.key as Tab)}
+                      style={{
+                        flex: 1, padding: '10px 16px', borderRadius: '8px', border: 'none', fontSize: '12px', fontWeight: '700', cursor: 'pointer',
+                        background: activeTab === tab.key ? accent : 'transparent',
+                        color: activeTab === tab.key ? '#fff' : colors.textMuted,
+                        transition: 'all 0.2s'
+                      }}
+                    >
+                      <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}><tab.icon size={14} /> {tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Görev (a): CopyButton sağ üstte yerini aldı */}
+                <CopyButton 
+                  getText={getFullMarkdown} 
+                  label={lang === 'tr' ? "Tüm Planı Kopyala" : "Copy Full Plan"} 
+                  copiedLabel={lang === 'tr' ? "Kopyalandı" : "Copied"} 
+                />
               </div>
 
               {/* Tab Content */}

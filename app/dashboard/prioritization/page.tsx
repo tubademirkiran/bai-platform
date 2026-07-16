@@ -5,7 +5,7 @@ import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
-import { Loader2, Scale, Target, BarChart3, ListChecks, LineChart, Upload, Lightbulb, type LucideIcon } from 'lucide-react'
+import { Loader2, Scale, Target, BarChart3, ListChecks, LineChart, Upload, Lightbulb, type LucideIcon, CheckCircle2 } from 'lucide-react'
 
 type Method = 'value_effort' | 'moscow' | 'rice'
 type Tab = 'list' | 'matrix' | 'export'
@@ -86,10 +86,11 @@ export default function PrioritizationPage() {
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 40px)', overflow: 'hidden' }}>
       
       <div style={{ flexShrink: 0 }}>
+        {/* Görev (a): PageHeader bileşenine Scale ikonu eklendi */}
         <PageHeader
           title="Prioritization Coach"
-          badge="PO/PM"
-          desc={lang === 'tr' ? 'Gereksinimleri iş hedefine göre analiz et ve yapay zeka ile önceliklendir.' : 'Analyze and prioritize requirements based on business goals using AI.'}
+          description={lang === 'tr' ? 'Gereksinimleri iş hedefine göre analiz et ve yapay zeka ile önceliklendir.' : 'Analyze and prioritize requirements based on business goals using AI.'}
+          icon={Scale}
         />
       </div>
 
@@ -130,8 +131,9 @@ export default function PrioritizationPage() {
                   <m.icon size={18} color={method === m.key ? accent : colors.textMuted} />
                   <div>
                     <div style={{ fontSize: '12px', fontWeight: '700', color: method === m.key ? accent : colors.text }}>{m.label}</div>
-                    <div style={{ fontSize: '10px', color: colors.textMuted }}>
-                      {results[m.key as Method] ? <span style={{ color: '#10b981' }}>✓ Hazır - </span> : ''}
+                    {/* Görev (a): Emoji yerine Lucide icon kullanıldı */}
+                    <div style={{ fontSize: '10px', color: colors.textMuted, display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {results[m.key as Method] ? <span style={{ color: '#10b981', display: 'flex', alignItems: 'center' }}><CheckCircle2 size={10} /> {lang === 'tr' ? 'Hazır -' : 'Ready -'} </span> : ''}
                       {m.desc}
                     </div>
                   </div>
@@ -214,21 +216,21 @@ export default function PrioritizationPage() {
                       <div style={{ display: 'flex', gap: '16px', paddingLeft: '8px' }}>
                         {method === 'value_effort' && (
                           <>
-                            <div style={{ fontSize: '12px', color: colors.textMuted }}>Değer: <span style={{ color: colors.text, fontWeight: '700' }}>{item.value_score}/10</span></div>
-                            <div style={{ fontSize: '12px', color: colors.textMuted }}>Efor: <span style={{ color: colors.text, fontWeight: '700' }}>{item.effort_score}/10</span></div>
+                            <div style={{ fontSize: '12px', color: colors.textMuted }}>{lang === 'tr' ? 'Değer:' : 'Value:'} <span style={{ color: colors.text, fontWeight: '700' }}>{item.value_score}/10</span></div>
+                            <div style={{ fontSize: '12px', color: colors.textMuted }}>{lang === 'tr' ? 'Efor:' : 'Effort:'} <span style={{ color: colors.text, fontWeight: '700' }}>{item.effort_score}/10</span></div>
                           </>
                         )}
                         {method === 'rice' && (
                           <>
-                            <div style={{ fontSize: '12px', color: colors.textMuted }}>Skor: <span style={{ color: accent, fontWeight: '800' }}>{item.score}</span></div>
-                            <div style={{ fontSize: '12px', color: colors.textMuted }}>Etki: <span style={{ color: colors.text, fontWeight: '700' }}>{item.impact}</span></div>
-                            <div style={{ fontSize: '12px', color: colors.textMuted }}>Efor: <span style={{ color: colors.text, fontWeight: '700' }}>{item.effort} Ay</span></div>
+                            <div style={{ fontSize: '12px', color: colors.textMuted }}>{lang === 'tr' ? 'Skor:' : 'Score:'} <span style={{ color: accent, fontWeight: '800' }}>{item.score}</span></div>
+                            <div style={{ fontSize: '12px', color: colors.textMuted }}>{lang === 'tr' ? 'Etki:' : 'Impact:'} <span style={{ color: colors.text, fontWeight: '700' }}>{item.impact}</span></div>
+                            <div style={{ fontSize: '12px', color: colors.textMuted }}>{lang === 'tr' ? 'Efor:' : 'Effort:'} <span style={{ color: colors.text, fontWeight: '700' }}>{item.effort} {lang === 'tr' ? 'Ay' : 'Months'}</span></div>
                           </>
                         )}
                       </div>
 
                       <div style={{ background: colors.bg, padding: '10px 12px', borderRadius: '8px', fontSize: '12px', color: colors.textMuted, borderLeft: `2px solid ${colors.border}`, marginLeft: '8px', fontStyle: 'italic' }}>
-                        <span style={{ fontWeight: '700', color: colors.text, marginRight: '4px' }}>Tavsiye:</span> 
+                        <span style={{ fontWeight: '700', color: colors.text, marginRight: '4px' }}>{lang === 'tr' ? 'Tavsiye:' : 'Advice:'}</span> 
                         {item.coach_advice}
                       </div>
                     </div>
@@ -239,13 +241,13 @@ export default function PrioritizationPage() {
               {currentTab === 'matrix' && method === 'value_effort' && (
                 <div style={{ flex: 1, overflowY: 'auto', background: colors.card, border: `1px solid ${colors.border}`, borderRadius: '12px', padding: '24px', display: 'flex', justifyContent: 'center' }}>
                   <div style={{ width: '100%', maxWidth: '500px', aspectRatio: '1/1', position: 'relative', borderLeft: `2px solid ${colors.text}`, borderBottom: `2px solid ${colors.text}`, margin: '20px' }}>
-                    <div style={{ position: 'absolute', top: '-25px', left: '-15px', fontSize: '12px', fontWeight: '700', color: colors.textMuted }}>Değer (Yüksek)</div>
-                    <div style={{ position: 'absolute', bottom: '-25px', right: '-15px', fontSize: '12px', fontWeight: '700', color: colors.textMuted }}>Efor (Yüksek)</div>
+                    <div style={{ position: 'absolute', top: '-25px', left: '-15px', fontSize: '12px', fontWeight: '700', color: colors.textMuted }}>{lang === 'tr' ? 'Değer (Yüksek)' : 'Value (High)'}</div>
+                    <div style={{ position: 'absolute', bottom: '-25px', right: '-15px', fontSize: '12px', fontWeight: '700', color: colors.textMuted }}>{lang === 'tr' ? 'Efor (Yüksek)' : 'Effort (High)'}</div>
                     
-                    <div style={{ position: 'absolute', top: 0, left: 0, width: '50%', height: '50%', background: '#10b98111', borderRight: `1px dashed ${colors.border}`, borderBottom: `1px dashed ${colors.border}` }}><span style={{ position:'absolute', top:'10px', left:'10px', fontSize:'10px', color:'#10b981', fontWeight:'700'}}>Hızlı Kazanımlar</span></div>
-                    <div style={{ position: 'absolute', top: 0, right: 0, width: '50%', height: '50%', background: '#3b82f611', borderBottom: `1px dashed ${colors.border}` }}><span style={{ position:'absolute', top:'10px', right:'10px', fontSize:'10px', color:'#3b82f6', fontWeight:'700'}}>Büyük Projeler</span></div>
-                    <div style={{ position: 'absolute', bottom: 0, left: 0, width: '50%', height: '50%', background: '#f59e0b11', borderRight: `1px dashed ${colors.border}` }}><span style={{ position:'absolute', bottom:'10px', left:'10px', fontSize:'10px', color:'#f59e0b', fontWeight:'700'}}>Doldurucular</span></div>
-                    <div style={{ position: 'absolute', bottom: 0, right: 0, width: '50%', height: '50%', background: '#ef444411' }}><span style={{ position:'absolute', bottom:'10px', right:'10px', fontSize:'10px', color:'#ef4444', fontWeight:'700'}}>Zaman Kaybı</span></div>
+                    <div style={{ position: 'absolute', top: 0, left: 0, width: '50%', height: '50%', background: '#10b98111', borderRight: `1px dashed ${colors.border}`, borderBottom: `1px dashed ${colors.border}` }}><span style={{ position:'absolute', top:'10px', left:'10px', fontSize:'10px', color:'#10b981', fontWeight:'700'}}>{lang === 'tr' ? 'Hızlı Kazanımlar' : 'Quick Wins'}</span></div>
+                    <div style={{ position: 'absolute', top: 0, right: 0, width: '50%', height: '50%', background: '#3b82f611', borderBottom: `1px dashed ${colors.border}` }}><span style={{ position:'absolute', top:'10px', right:'10px', fontSize:'10px', color:'#3b82f6', fontWeight:'700'}}>{lang === 'tr' ? 'Büyük Projeler' : 'Major Projects'}</span></div>
+                    <div style={{ position: 'absolute', bottom: 0, left: 0, width: '50%', height: '50%', background: '#f59e0b11', borderRight: `1px dashed ${colors.border}` }}><span style={{ position:'absolute', bottom:'10px', left:'10px', fontSize:'10px', color:'#f59e0b', fontWeight:'700'}}>{lang === 'tr' ? 'Doldurucular' : 'Fill-Ins'}</span></div>
+                    <div style={{ position: 'absolute', bottom: 0, right: 0, width: '50%', height: '50%', background: '#ef444411' }}><span style={{ position:'absolute', bottom:'10px', right:'10px', fontSize:'10px', color:'#ef4444', fontWeight:'700'}}>{lang === 'tr' ? 'Zaman Kaybı' : 'Time Wasters'}</span></div>
 
                     {currentResult.items.map((item: any, idx: number) => {
                       const leftPos = (item.effort_score / 10) * 100;
@@ -254,7 +256,7 @@ export default function PrioritizationPage() {
                         <div key={idx} style={{ position: 'absolute', left: `${leftPos}%`, bottom: `${bottomPos}%`, transform: 'translate(-50%, 50%)', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
                           <div style={{ width: '16px', height: '16px', borderRadius: '50%', background: getCategoryColor(item.category), border: '2px solid #fff', boxShadow: '0 2px 4px rgba(0,0,0,0.2)' }} title={item.requirement} />
                           <div style={{ fontSize: '10px', fontWeight: '700', color: colors.text, marginTop: '4px', background: colors.bg, padding: '2px 4px', borderRadius: '4px', border: `1px solid ${colors.border}`, whiteSpace: 'nowrap' }}>
-                            İtem {idx + 1}
+                            {lang === 'tr' ? `İtem ${idx + 1}` : `Item ${idx + 1}`}
                           </div>
                         </div>
                       )
@@ -267,7 +269,8 @@ export default function PrioritizationPage() {
                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', background: '#1e1e1e', border: `1px solid ${colors.border}`, borderRadius: '12px', overflow: 'hidden' }}>
                   <div style={{ padding: '10px 16px', borderBottom: '1px solid #333', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: '#252526', flexShrink: 0 }}>
                     <span style={{ fontSize: '11px', fontWeight: '700', color: '#888' }}>Markdown / Jira Formatı</span>
-                    <CopyButton getText={buildExportText} />
+                    {/* Görev (a): CopyButton dil desteği eklendi */}
+                    <CopyButton getText={buildExportText} label={lang === 'tr' ? 'Kopyala' : 'Copy'} copiedLabel={lang === 'tr' ? 'Kopyalandı' : 'Copied'} />
                   </div>
                   <div style={{ flex: 1, padding: '16px', fontSize: '12px', color: '#d4d4d4', lineHeight: '1.6', overflowY: 'auto', fontFamily: '"Fira Code", monospace', whiteSpace: 'pre-wrap', wordWrap: 'break-word' }}>
                     {buildExportText()}

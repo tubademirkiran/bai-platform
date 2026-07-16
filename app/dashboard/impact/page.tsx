@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
 import {
   Loader2, FlaskConical, Search, FolderTree, Database, CheckCircle2,
-  AlertTriangle, AlertOctagon, AlertCircle, type LucideIcon,
+  AlertTriangle, AlertOctagon, AlertCircle, type LucideIcon, Activity
 } from 'lucide-react'
 
 export default function ImpactPage() {
@@ -47,6 +47,8 @@ export default function ImpactPage() {
       dbTitle: 'VERİTABANI ETKİLERİ',
       testTitle: 'GÜNCELLENMESİ GEREKEN TEST SENARYOLARI',
       aiTitle: 'AI ÖNERİSİ',
+      copyBtn: 'Kopyala',
+      copiedBtn: 'Kopyalandı',
     },
     en: {
       title: 'Impact Analyzer',
@@ -74,6 +76,8 @@ export default function ImpactPage() {
       dbTitle: 'DATABASE IMPACTS',
       testTitle: 'TEST CASES TO UPDATE',
       aiTitle: 'AI RECOMMENDATION',
+      copyBtn: 'Copy',
+      copiedBtn: 'Copied',
     },
     de: {
       title: 'Auswirkungsanalyse',
@@ -101,6 +105,8 @@ export default function ImpactPage() {
       dbTitle: 'DATENBANKAUSWIRKUNGEN',
       testTitle: 'ZU AKTUALISIERENDE TESTFÄLLE',
       aiTitle: 'KI-EMPFEHLUNG',
+      copyBtn: 'Kopieren',
+      copiedBtn: 'Kopiert',
     },
   }
 
@@ -170,7 +176,8 @@ export default function ImpactPage() {
 
   return (
     <div>
-      <PageHeader title={s.title} desc={s.desc} />
+      {/* Görev (a): PageHeader prop'u desc'ten description'a güncellendi ve Activity ikonu eklendi */}
+      <PageHeader title={s.title} description={s.desc} icon={Activity} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: '16px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -253,7 +260,8 @@ export default function ImpactPage() {
                   <div style={{ fontSize: '18px', fontWeight: '800', color: getRiskColor(result.riskLevel) }}>{result.riskLevel}</div>
                   <div style={{ fontSize: '12px', color: colors.textMuted, marginTop: '2px' }}>{result.summary}</div>
                 </div>
-                <CopyButton getText={() => JSON.stringify(result, null, 2)} />
+                {/* Görev (a): CopyButton eksik dilleri (label ve copiedLabel) eklendi */}
+                <CopyButton getText={() => JSON.stringify(result, null, 2)} label={s.copyBtn} copiedLabel={s.copiedBtn} />
               </div>
 
               {result.affectedModules?.length > 0 && (

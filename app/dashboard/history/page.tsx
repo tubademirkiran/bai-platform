@@ -75,9 +75,11 @@ export default function HistoryPage() {
   }
 
   // Modül isimlerine göre ikon belirleme (lucide — platform bağımsız, kurumsal)
+// Modül isimlerine göre ikon belirleme (lucide — platform bağımsız, kurumsal)
   const getModuleIcon = (moduleName: string) => {
     const name = moduleName.toLowerCase()
     const p = { size: 20 }
+    if (name.includes('atlas') || name.includes('bmad')) return <TerminalSquare {...p} /> // <--- BURASI EKLENDİ
     if (name.includes('requirement')) return <FileText {...p} />
     if (name.includes('sql')) return <Database {...p} />
     if (name.includes('risk')) return <AlertTriangle {...p} />

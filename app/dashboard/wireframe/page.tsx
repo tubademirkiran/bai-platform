@@ -7,7 +7,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
 import {
   Loader2, Palette, Monitor, Smartphone, Tablet, MousePointerClick, Code2,
-  Download, Pencil, FileText, Link2, Package, Square, type LucideIcon,
+  Download, Pencil, FileText, Link2, Package, Square, type LucideIcon, Layout
 } from 'lucide-react'
 
 type Platform = 'web' | 'mobile' | 'responsive'
@@ -97,13 +97,14 @@ export default function WireframePage() {
 
   return (
     <div>
+      {/* Görev (a): PageHeader prop'ları güncellendi ve Layout ikonu eklendi */}
       <PageHeader
         title={lang === 'tr' ? 'Wireframe & Prototip Üretici' : 'Wireframe & Prototype Generator'}
-        badge="UI/UX"
-        desc={lang === 'tr' ? 'Gereksinimden otomatik ekran taslağı ve tıklanabilir prototip üret.' : 'Generate wireframe and clickable prototype from requirements.'}
+        description={lang === 'tr' ? 'Gereksinimden otomatik ekran taslağı ve tıklanabilir prototip üret.' : 'Generate wireframe and clickable prototype from requirements.'}
+        icon={Layout}
       />
 
-      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '16px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '340px minmax(0, 1fr)', gap: '16px' }}>
 
         {/* Sol Panel */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -257,7 +258,8 @@ export default function WireframePage() {
                   </button>
                 ))}
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
-                  <CopyButton getText={() => result?.htmlCode || ''} label={lang === 'tr' ? 'Kopyala' : 'Copy'} copiedLabel={lang === 'tr' ? 'Kopyalandı' : 'Copied'} />
+                  {/* Görev (a): CopyButton dil prop'ları tanımlandı */}
+                  <CopyButton getText={() => result?.htmlCode || ''} label={lang === 'tr' ? 'Kodu Kopyala' : 'Copy Code'} copiedLabel={lang === 'tr' ? 'Kopyalandı' : 'Copied'} />
                   <button onClick={handleDownload} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: '6px', color: accent, border: `0.5px solid ${accent}44` }}>
                     <Download size={14} /> {lang === 'tr' ? 'İndir' : 'Download'}
                   </button>

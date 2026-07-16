@@ -5,10 +5,10 @@ import { GeneratorTool } from '@/components/generator-tool'
 
 const templatesByLang = {
   tr: [
-    { label: 'Login Modulu', text: 'Kullanici email ve sifre ile sisteme giris yapabilmeli.' },
-    { label: 'Odeme Sistemi', text: 'Kullanici kredi karti ile odeme yapabilmeli. 3D secure desteklenmeli.' },
-    { label: 'Bildirim', text: 'Sistem kullaniciya email ve push notification gonderebilmeli.' },
-    { label: 'Rapor', text: 'Kullanici tarih araligina gore satis raporlarini PDF olarak indirebilmeli.' },
+    { label: 'Login Modülü', text: 'Kullanıcı e-posta ve şifre ile sisteme giriş yapabilmeli.' },
+    { label: 'Ödeme Sistemi', text: 'Kullanıcı kredi kartı ile ödeme yapabilmeli. 3D secure desteklenmeli.' },
+    { label: 'Bildirim', text: 'Sistem kullanıcıya e-posta ve anlık (push) bildirimler gönderebilmeli.' },
+    { label: 'Rapor', text: 'Kullanıcı tarih aralığına göre satış raporlarını PDF olarak indirebilmeli.' },
   ],
   en: [
     { label: 'Login Module', text: 'Users should be able to log in with email and password.' },
@@ -26,7 +26,8 @@ const templatesByLang = {
 
 export default function RequirementPage() {
   const { t, lang } = useTheme()
-  const templates = templatesByLang[lang] || templatesByLang.tr
+  // TS için küçük bir tip güvenliği ekliyoruz
+  const templates = templatesByLang[lang as keyof typeof templatesByLang] || templatesByLang.tr
 
   return (
     <GeneratorTool
