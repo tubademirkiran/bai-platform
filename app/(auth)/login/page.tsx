@@ -45,10 +45,19 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex flex-col items-center justify-center gap-6 bg-gradient-to-b from-slate-50 to-slate-100 px-4 py-10">
+      <div className="flex flex-col items-center gap-3">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[#7c3aed] text-lg font-extrabold text-white shadow-lg shadow-[#7c3aed]/30">
+          B
+        </div>
+        <div className="text-center">
+          <div className="text-lg font-extrabold tracking-tight text-slate-900">BAI Platform</div>
+          <div className="text-xs font-medium text-slate-500">AI Business Analyst</div>
+        </div>
+      </div>
       <Card className="w-full max-w-md">
         <CardHeader>
-          <CardTitle className="text-2xl text-center">BAI&apos;ye Giriş Yap</CardTitle>
+          <CardTitle className="text-2xl text-center">Giriş Yap</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -75,7 +84,7 @@ export default function LoginPage() {
           </Button>
           <p className="text-center text-sm text-gray-500">
             Hesabın yok mu?{' '}
-            <Link href="/register" className="text-blue-600 hover:underline">
+            <Link href="/register" className="font-medium text-[#7c3aed] hover:underline">
               Kayıt ol
             </Link>
           </p>

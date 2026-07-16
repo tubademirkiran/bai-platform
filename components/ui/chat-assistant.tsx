@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { useTheme } from '@/lib/theme-context'
+import { Bot, X } from 'lucide-react'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -77,7 +78,7 @@ export default function ChatAssistant() {
           background: accent,
           border: 'none',
           cursor: 'pointer',
-          fontSize: '22px',
+          color: '#fff',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -85,10 +86,11 @@ export default function ChatAssistant() {
           zIndex: 1000,
           transition: 'transform 0.2s',
         }}
+        aria-label={open ? 'Asistanı kapat' : 'Asistanı aç'}
         onMouseEnter={e => (e.currentTarget.style.transform = 'scale(1.1)')}
         onMouseLeave={e => (e.currentTarget.style.transform = 'scale(1)')}
       >
-        {open ? '✕' : '🤖'}
+        {open ? <X size={22} /> : <Bot size={24} />}
       </button>
 
       {open && (
@@ -108,7 +110,7 @@ export default function ChatAssistant() {
           overflow: 'hidden',
         }}>
           <div style={{ padding: '14px 16px', borderBottom: `0.5px solid ${colors.border}`, display: 'flex', alignItems: 'center', gap: '10px', background: accent }}>
-            <div style={{ fontSize: '20px' }}>🤖</div>
+            <Bot size={20} color="#fff" />
             <div>
               <div style={{ fontSize: '13px', fontWeight: '700', color: '#fff' }}>BAI Asistan</div>
               <div style={{ fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>AI Business Analyst</div>

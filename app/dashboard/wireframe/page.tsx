@@ -3,6 +3,12 @@
 import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
+import { PageHeader } from '@/components/ui/page-header'
+import { CopyButton } from '@/components/ui/copy-button'
+import {
+  Loader2, Palette, Monitor, Smartphone, Tablet, MousePointerClick, Code2,
+  Download, Pencil, FileText, Link2, Package, Square, type LucideIcon,
+} from 'lucide-react'
 
 type Platform = 'web' | 'mobile' | 'responsive'
 type DesignStyle = 'wireframe' | 'lowfi' | 'hifi'
@@ -60,16 +66,15 @@ export default function WireframePage() {
     a.click()
   }
 
-  async function handleCopyCode() {
-    if (!result?.htmlCode) return
-    await navigator.clipboard.writeText(result.htmlCode)
-  }
-
-  const platforms = [
-    { key: 'web', label: lang === 'tr' ? 'Web (Desktop)' : 'Web (Desktop)', icon: '🖥️' },
-    { key: 'mobile', label: lang === 'tr' ? 'Mobil' : 'Mobile', icon: '📱' },
-    { key: 'responsive', label: 'Responsive', icon: '📐' },
+  const platforms: { key: string; label: string; icon: LucideIcon }[] = [
+    { key: 'web', label: 'Web (Desktop)', icon: Monitor },
+    { key: 'mobile', label: lang === 'tr' ? 'Mobil' : 'Mobile', icon: Smartphone },
+    { key: 'responsive', label: 'Responsive', icon: Tablet },
   ]
+
+  const componentIcon: Record<string, LucideIcon> = {
+    input: FileText, button: MousePointerClick, link: Link2, group: Package, text: Pencil,
+  }
 
   const styles = [
     { key: 'wireframe', label: lang === 'tr' ? 'Tel Kafes' : 'Wireframe', desc: lang === 'tr' ? 'Siyah/Beyaz/Çizgisel' : 'Black/White/Lines' },
@@ -77,10 +82,10 @@ export default function WireframePage() {
     { key: 'hifi', label: 'Hi-Fi', desc: lang === 'tr' ? 'Kurumsal Tema' : 'Corporate Theme' },
   ]
 
-  const tabs = [
-    { key: 'preview', label: lang === 'tr' ? '🎨 Görsel Önizleme' : '🎨 Visual Preview' },
-    { key: 'interactive', label: lang === 'tr' ? '👆 Etkileşim Modu' : '👆 Interactive' },
-    { key: 'code', label: lang === 'tr' ? '💻 UI Kodu' : '💻 UI Code' },
+  const tabs: { key: string; label: string; icon: LucideIcon }[] = [
+    { key: 'preview', label: lang === 'tr' ? 'Görsel Önizleme' : 'Visual Preview', icon: Palette },
+    { key: 'interactive', label: lang === 'tr' ? 'Etkileşim Modu' : 'Interactive', icon: MousePointerClick },
+    { key: 'code', label: lang === 'tr' ? 'UI Kodu' : 'UI Code', icon: Code2 },
   ]
 
   const btnStyle = {
@@ -92,17 +97,11 @@ export default function WireframePage() {
 
   return (
     <div>
-      <div style={{ marginBottom: '20px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: '800', color: colors.text, margin: 0 }}>
-            {lang === 'tr' ? 'Wireframe & Prototip Üretici' : 'Wireframe & Prototype Generator'}
-          </h2>
-          <span style={{ fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '20px', background: accent + '22', color: accent }}>UI/UX</span>
-        </div>
-        <p style={{ fontSize: '13px', color: colors.textMuted, margin: 0 }}>
-          {lang === 'tr' ? 'Gereksinimden otomatik ekran taslağı ve tıklanabilir prototip üret.' : 'Generate wireframe and clickable prototype from requirements.'}
-        </p>
-      </div>
+      <PageHeader
+        title={lang === 'tr' ? 'Wireframe & Prototip Üretici' : 'Wireframe & Prototype Generator'}
+        badge="UI/UX"
+        desc={lang === 'tr' ? 'Gereksinimden otomatik ekran taslağı ve tıklanabilir prototip üret.' : 'Generate wireframe and clickable prototype from requirements.'}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '16px' }}>
 
@@ -129,7 +128,7 @@ export default function WireframePage() {
               {platforms.map(p => (
                 <button key={p.key} onClick={() => setPlatform(p.key as Platform)}
                   style={{ flex: 1, padding: '8px 4px', borderRadius: '8px', border: platform === p.key ? `2px solid ${accent}` : `0.5px solid ${colors.border}`, background: platform === p.key ? accent + '22' : 'transparent', color: platform === p.key ? accent : colors.textMuted, fontSize: '11px', fontWeight: '600', cursor: 'pointer', textAlign: 'center' as const }}>
-                  <div style={{ fontSize: '16px', marginBottom: '2px' }}>{p.icon}</div>
+                  <div style={{ marginBottom: '2px', display: 'flex', justifyContent: 'center' }}><p.icon size={16} /></div>
                   <div>{p.label}</div>
                 </button>
               ))}
@@ -156,7 +155,7 @@ export default function WireframePage() {
               disabled={loading || !requirement.trim()}
               style={{ width: '100%', padding: '11px', borderRadius: '8px', border: 'none', background: !requirement.trim() ? colors.border : accent, color: '#fff', fontWeight: '700', fontSize: '13px', cursor: (loading || !requirement.trim()) ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1 }}
             >
-              {loading ? (lang === 'tr' ? '⚙️ AI üretiyor...' : '⚙️ AI generating...') : (lang === 'tr' ? '🎨 Taslak & Prototip Üret' : '🎨 Generate Wireframe & Prototype')}
+              {loading ? (lang === 'tr' ? 'AI üretiyor...' : 'AI generating...') : (lang === 'tr' ? 'Taslak & Prototip Üret' : 'Generate Wireframe & Prototype')}
             </button>
           </div>
 
@@ -174,7 +173,7 @@ export default function WireframePage() {
               />
               <button onClick={handleRevision} disabled={revising || !revisionCmd.trim()}
                 style={{ width: '100%', padding: '8px', borderRadius: '8px', border: 'none', background: revisionCmd.trim() ? accent : colors.border, color: '#fff', fontWeight: '600', fontSize: '12px', cursor: revisionCmd.trim() ? 'pointer' : 'not-allowed' }}>
-                {revising ? (lang === 'tr' ? 'Revize ediliyor...' : 'Revising...') : (lang === 'tr' ? '✏️ Revize Et' : '✏️ Revise')}
+                {revising ? (lang === 'tr' ? 'Revize ediliyor...' : 'Revising...') : (lang === 'tr' ? 'Revize Et' : 'Revise')}
               </button>
             </div>
           )}
@@ -185,17 +184,20 @@ export default function WireframePage() {
                 {lang === 'tr' ? 'TESPİT EDİLEN BİLEŞENLER' : 'DETECTED COMPONENTS'}
               </div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                {result.components.map((comp: any, i: number) => (
+                {result.components.map((comp: any, i: number) => {
+                  const CompIc = componentIcon[comp.type] || Square
+                  return (
                   <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 8px', borderRadius: '6px', background: colors.bg }}>
-                    <span style={{ fontSize: '14px' }}>
-                      {comp.type === 'input' ? '📝' : comp.type === 'button' ? '🔘' : comp.type === 'link' ? '🔗' : comp.type === 'group' ? '📦' : comp.type === 'text' ? '✏️' : '🔷'}
+                    <span style={{ display: 'flex', color: colors.textMuted }}>
+                      <CompIc size={14} />
                     </span>
                     <div>
                       <span style={{ fontSize: '12px', fontWeight: '600', color: colors.text }}>{comp.label || comp.type}</span>
                       <span style={{ fontSize: '10px', color: colors.textMuted, marginLeft: '6px' }}>{comp.type}</span>
                     </div>
                   </div>
-                ))}
+                  )
+                })}
               </div>
             </div>
           )}
@@ -206,7 +208,7 @@ export default function WireframePage() {
 
           {!result && !loading && (
             <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '500px', gap: '16px' }}>
-              <div style={{ fontSize: '64px', opacity: 0.15 }}>🎨</div>
+              <Palette size={56} style={{ opacity: 0.15 }} />
               <div style={{ fontSize: '15px', fontWeight: '600', color: colors.textMuted }}>{lang === 'tr' ? 'Gereksinim yazın ve üretin' : 'Write requirement and generate'}</div>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'center' }}>
                 {[
@@ -228,7 +230,7 @@ export default function WireframePage() {
 
           {loading && (
             <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '60px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '500px', gap: '20px' }}>
-              <div style={{ fontSize: '48px' }}>🎨</div>
+              <Loader2 size={40} style={{ animation: 'pulse 1.5s infinite' }} />
               <div style={{ fontSize: '15px', fontWeight: '600', color: colors.text }}>{lang === 'tr' ? 'Tasarım üretiliyor...' : 'Generating design...'}</div>
               {[
                 lang === 'tr' ? 'Gereksinim analiz ediliyor' : 'Analyzing requirement',
@@ -250,14 +252,14 @@ export default function WireframePage() {
               <div style={{ display: 'flex', gap: '6px' }}>
                 {tabs.map(tab => (
                   <button key={tab.key} onClick={() => setActiveTab(tab.key as OutputTab)}
-                    style={{ padding: '9px 16px', borderRadius: '8px', border: activeTab === tab.key ? `2px solid ${accent}` : `0.5px solid ${colors.border}`, background: activeTab === tab.key ? accent + '22' : colors.card, color: activeTab === tab.key ? accent : colors.textMuted, fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
-                    {tab.label}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', padding: '9px 16px', borderRadius: '8px', border: activeTab === tab.key ? `2px solid ${accent}` : `0.5px solid ${colors.border}`, background: activeTab === tab.key ? accent + '22' : colors.card, color: activeTab === tab.key ? accent : colors.textMuted, fontSize: '12px', fontWeight: '600', cursor: 'pointer' }}>
+                    <tab.icon size={14} /> {tab.label}
                   </button>
                 ))}
                 <div style={{ marginLeft: 'auto', display: 'flex', gap: '6px' }}>
-                  <button onClick={handleCopyCode} style={btnStyle}>📋 {lang === 'tr' ? 'Kopyala' : 'Copy'}</button>
-                  <button onClick={handleDownload} style={{ ...btnStyle, color: accent, border: `0.5px solid ${accent}44` }}>
-                    💾 {lang === 'tr' ? 'İndir' : 'Download'}
+                  <CopyButton getText={() => result?.htmlCode || ''} label={lang === 'tr' ? 'Kopyala' : 'Copy'} copiedLabel={lang === 'tr' ? 'Kopyalandı' : 'Copied'} />
+                  <button onClick={handleDownload} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: '6px', color: accent, border: `0.5px solid ${accent}44` }}>
+                    <Download size={14} /> {lang === 'tr' ? 'İndir' : 'Download'}
                   </button>
                 </div>
               </div>

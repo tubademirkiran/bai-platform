@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
+import { EmptyState } from '@/components/ui/empty-state'
+import { Loader2, Users } from 'lucide-react'
 
 type TechLevel = 'Düşük' | 'Orta' | 'Yüksek' | 'Low' | 'Medium' | 'High'
 
@@ -142,21 +144,21 @@ export default function PersonaPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', height: '100%', overflowY: 'auto', paddingRight: '4px', paddingBottom: '20px' }}>
           
           {loading && (
-            <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '500px', gap: '20px' }}>
-              <div style={{ fontSize: '48px', animation: 'pulse 2s infinite' }}>🎭</div>
-              <div style={{ fontSize: '15px', fontWeight: '600', color: colors.text }}>
-                {lang === 'tr' ? 'Hedef kitle analizi yapılıyor...' : 'Analyzing target audience...'}
-              </div>
-            </div>
+            <EmptyState
+              minHeight={500}
+              dashed={false}
+              icon={<Loader2 size={40} style={{ animation: 'pulse 1.5s infinite' }} />}
+              text={lang === 'tr' ? 'Hedef kitle analizi yapılıyor...' : 'Analyzing target audience...'}
+            />
           )}
 
           {!result && !loading && (
-            <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '500px', gap: '16px', padding: '40px', textAlign: 'center' }}>
-              <div style={{ fontSize: '64px', opacity: 0.15 }}>👥</div>
-              <div style={{ fontSize: '15px', fontWeight: '600', color: colors.textMuted }}>
-                {lang === 'tr' ? 'Ürün detaylarını girin, gerçekçi kullanıcı senaryoları oluşsun.' : 'Enter product details to create realistic user scenarios.'}
-              </div>
-            </div>
+            <EmptyState
+              minHeight={500}
+              dashed={false}
+              icon={<Users size={56} />}
+              text={lang === 'tr' ? 'Ürün detaylarını girin, gerçekçi kullanıcı senaryoları oluşsun.' : 'Enter product details to create realistic user scenarios.'}
+            />
           )}
 
           {result && !loading && (

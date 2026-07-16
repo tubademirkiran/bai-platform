@@ -1,14 +1,15 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useRef } from 'react'
 
 /**
  * Streaming üretim modülleri için ortak hook.
  * fetch + loading + error + token-token akış okumayı tek yerde toplar.
  *
  * Kullanım:
- *   const { text: result, loading, error, run } = useGenerate('/api/requirement/generate')
+ *   const { text: result, loading, error, run, stop } = useGenerate('/api/requirement/generate')
  *   await run({ idea, lang })
+ *   stop() // devam eden üretimi iptal eder
  *
  * Route text/plain bir akış döndürür; hata durumunda JSON { error } döner (res.ok=false).
  */
@@ -16,9 +17,20 @@ export function useGenerate(endpoint: string) {
   const [text, setText] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const abortRef = useRef<AbortController | null>(null)
+
+  // Devam eden üretimi kullanıcı isteğiyle iptal eder.
+  const stop = useCallback(() => {
+    abortRef.current?.abort()
+  }, [])
 
   const run = useCallback(
     async (body: unknown): Promise<string | null> => {
+      // Önceki bir akış varsa iptal et, yenisini başlat.
+      abortRef.current?.abort()
+      const controller = new AbortController()
+      abortRef.current = controller
+
       setLoading(true)
       setError(null)
       setText('')
@@ -27,6 +39,7 @@ export function useGenerate(endpoint: string) {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
+          signal: controller.signal,
         })
 
         if (!res.ok || !res.body) {
@@ -45,15 +58,20 @@ export function useGenerate(endpoint: string) {
         }
         return acc
       } catch (e) {
+        // Kullanıcı iptal ettiyse hata gösterme — o ana kadar gelen metni koru.
+        if (e instanceof DOMException && e.name === 'AbortError') {
+          return null
+        }
         const message = e instanceof Error ? e.message : 'Beklenmeyen bir hata oluştu.'
         setError(message)
         return null
       } finally {
         setLoading(false)
+        abortRef.current = null
       }
     },
     [endpoint]
   )
 
-  return { text, loading, error, run, setText }
+  return { text, loading, error, run, stop, setText }
 }

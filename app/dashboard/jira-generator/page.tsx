@@ -3,6 +3,10 @@
 import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
+import { EmptyState } from '@/components/ui/empty-state'
+import { PageHeader } from '@/components/ui/page-header'
+import { CopyButton } from '@/components/ui/copy-button'
+import { Loader2, Ticket, Bug, Zap, Tag, User, CheckCircle2, Settings, Ban, Rocket } from 'lucide-react'
 // Geçmişe kayıt server tarafında (API route) yapılıyor.
 
 export default function JiraGeneratorPage() {
@@ -41,12 +45,9 @@ export default function JiraGeneratorPage() {
     }
   }
 
-  const handleCopy = () => {
-    if (!result) return
-    const text = `h2. Özet\n${result.summary}\n\nh2. User Story\n${result.user_story}\n\nh2. Kabul Kriterleri (Acceptance Criteria)\n${result.acceptance_criteria.map((c: string) => `* ${c}`).join('\n')}\n\nh2. Teknik Notlar & Varsayımlar\n${result.technical_notes}\n\nh2. Kapsam Dışı (Out of Scope)\n${result.out_of_scope}\n\n**Story Point:** ${result.story_point} (${result.sp_reason})\n**Önerilen Etiketler:** ${result.labels.join(', ')}`
-    navigator.clipboard.writeText(text)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+  const buildJiraText = () => {
+    if (!result) return ''
+    return `h2. Özet\n${result.summary}\n\nh2. User Story\n${result.user_story}\n\nh2. Kabul Kriterleri (Acceptance Criteria)\n${result.acceptance_criteria.map((c: string) => `* ${c}`).join('\n')}\n\nh2. Teknik Notlar & Varsayımlar\n${result.technical_notes}\n\nh2. Kapsam Dışı (Out of Scope)\n${result.out_of_scope}\n\n**Story Point:** ${result.story_point} (${result.sp_reason})\n**Önerilen Etiketler:** ${result.labels.join(', ')}`
   }
 
   const inputStyle = {
@@ -63,18 +64,11 @@ export default function JiraGeneratorPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' }}>
-      {/* Header */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: '800', color: colors.text, margin: 0 }}>
-            {lang === 'tr' ? 'AI Jira Issue Generator' : 'AI Jira Issue Generator'}
-          </h2>
-          <span style={{ fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '20px', background: accent + '22', color: accent }}>Agile/Scrum</span>
-        </div>
-        <p style={{ fontSize: '13px', color: colors.textMuted, marginTop: '4px' }}>
-          {lang === 'tr' ? 'Ham talepleri "Developer-Ready" (Geliştirmeye Hazır) teknik Jira biletlerine dönüştürün.' : 'Convert raw requests into Developer-Ready technical Jira tickets.'}
-        </p>
-      </div>
+      <PageHeader
+        title="AI Jira Issue Generator"
+        badge="Agile/Scrum"
+        desc={lang === 'tr' ? 'Ham talepleri Developer-Ready (Geliştirmeye Hazır) teknik Jira biletlerine dönüştürün.' : 'Convert raw requests into Developer-Ready technical Jira tickets.'}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '16px', alignItems: 'start', flex: 1 }}>
         
@@ -139,7 +133,7 @@ export default function JiraGeneratorPage() {
             disabled={loading || !form.requirement.trim()}
             style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', background: !form.requirement.trim() ? colors.border : accent, color: '#fff', fontWeight: '700', cursor: (loading || !form.requirement.trim()) ? 'not-allowed' : 'pointer' }}
           >
-            {loading ? '⚙️ Bilet Oluşturuluyor...' : '🎫 Jira Bileti Üret'}
+            {loading ? 'Bilet Oluşturuluyor...' : 'Jira Bileti Üret'}
           </button>
         </div>
 
@@ -147,17 +141,11 @@ export default function JiraGeneratorPage() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
           
           {loading && (
-            <div style={{ background: colors.card, border: `1px dashed ${colors.border}`, borderRadius: '12px', height: '500px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textMuted }}>
-              <div style={{ fontSize: '48px', animation: 'pulse 2s infinite' }}>🧠</div>
-              <div style={{ marginTop: '16px', fontSize: '14px', fontWeight: '600' }}>Mimari ve teknik detaylar analiz ediliyor...</div>
-            </div>
+            <EmptyState minHeight={500} icon={<Loader2 size={40} style={{ animation: 'pulse 1.5s infinite' }} />} text="Mimari ve teknik detaylar analiz ediliyor..." />
           )}
 
           {!result && !loading && (
-            <div style={{ background: colors.card, border: `1px dashed ${colors.border}`, borderRadius: '12px', height: '500px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textMuted }}>
-              <div style={{ fontSize: '64px', opacity: 0.2 }}>🎫</div>
-              <div style={{ marginTop: '16px', fontSize: '14px', fontWeight: '600' }}>Developer'ların seveceği, teknik derinliği olan Jira biletleri üretin.</div>
-            </div>
+            <EmptyState minHeight={500} icon={<Ticket size={56} />} text="Developer'ların seveceği, teknik derinliği olan Jira biletleri üretin." />
           )}
 
           {result && !loading && (
@@ -166,19 +154,17 @@ export default function JiraGeneratorPage() {
               {/* TICKET HEADER */}
               <div style={{ padding: '16px 24px', borderBottom: `1px solid ${colors.border}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: isDark ? '#0d1117' : '#f8fafc' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <div style={{ background: form.issueType === 'Bug' ? '#ef4444' : form.issueType === 'Epic' ? '#8b5cf6' : '#10b981', color: '#fff', fontSize: '12px', padding: '4px', borderRadius: '4px', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {form.issueType === 'Bug' ? '🐛' : form.issueType === 'Epic' ? '⚡' : '🏷️'}
+                  <div style={{ background: form.issueType === 'Bug' ? '#ef4444' : form.issueType === 'Epic' ? '#8b5cf6' : '#10b981', color: '#fff', padding: '4px', borderRadius: '4px', width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {form.issueType === 'Bug' ? <Bug size={14} /> : form.issueType === 'Epic' ? <Zap size={14} /> : <Tag size={14} />}
                   </div>
                   <div style={{ fontSize: '14px', color: colors.textMuted, fontWeight: '500' }}>
                     {form.project}-<span style={{ color: colors.text, fontWeight: '700' }}>{Math.floor(Math.random() * 8999 + 1000)}</span>
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <button onClick={handleCopy} style={{ padding: '6px 12px', borderRadius: '6px', border: `1px solid ${colors.border}`, background: colors.bg, color: colors.text, fontSize: '12px', fontWeight: '600', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                    {copied ? '✅ Kopyalandı' : '📋 Kopyala'}
-                  </button>
-                  <button style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#0052CC', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: 'not-allowed', opacity: 0.7 }} title="Jira entegrasyonu yakında eklenecektir.">
-                    🚀 Jira'ya Aktar (Yakında)
+                  <CopyButton getText={buildJiraText} />
+                  <button style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#0052CC', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: 'not-allowed', opacity: 0.7, display: 'inline-flex', alignItems: 'center', gap: '6px' }} title="Jira entegrasyonu yakında eklenecektir.">
+                    <Rocket size={13} /> Jira&apos;ya Aktar (Yakında)
                   </button>
                 </div>
               </div>

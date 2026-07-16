@@ -4,6 +4,12 @@ import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
 import { getHistory } from '@/lib/history'
+import { PageHeader } from '@/components/ui/page-header'
+import { CopyButton } from '@/components/ui/copy-button'
+import {
+  Loader2, FlaskConical, Search, FolderTree, Database, CheckCircle2,
+  AlertTriangle, AlertOctagon, AlertCircle, type LucideIcon,
+} from 'lucide-react'
 
 export default function ImpactPage() {
   const { accent, colors, lang } = useTheme()
@@ -13,7 +19,6 @@ export default function ImpactPage() {
   const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [loadingHistory, setLoadingHistory] = useState(false)
-  const [copied, setCopied] = useState(false)
 
   const ui = {
     tr: {
@@ -27,7 +32,7 @@ export default function ImpactPage() {
       contextLabel: 'SİSTEM KONTEKSTİ (Opsiyonel)',
       contextPlaceholder: 'Sistem mimarisi, mevcut modüller veya dokümanları buraya yapıştırın...',
       contextHint: 'Geçmiş modülü otomatik doldurur veya manuel yazabilirsiniz',
-      loadHistory: '🕓 Geçmişten Yükle',
+      loadHistory: 'Geçmişten Yükle',
       loadingHistory: 'Yükleniyor...',
       analyzeBtn: 'Etki Analizini Başlat',
       analyzingBtn: 'AI analiz ediyor...',
@@ -54,7 +59,7 @@ export default function ImpactPage() {
       contextLabel: 'SYSTEM CONTEXT (Optional)',
       contextPlaceholder: 'Paste system architecture, existing modules or documents here...',
       contextHint: 'History module fills this automatically or you can write manually',
-      loadHistory: '🕓 Load from History',
+      loadHistory: 'Load from History',
       loadingHistory: 'Loading...',
       analyzeBtn: 'Start Impact Analysis',
       analyzingBtn: 'AI analyzing...',
@@ -81,7 +86,7 @@ export default function ImpactPage() {
       contextLabel: 'SYSTEMKONTEXT (Optional)',
       contextPlaceholder: 'Systemarchitektur, vorhandene Module oder Dokumente hier einfügen...',
       contextHint: 'Verlaufsmodul füllt dies automatisch aus oder Sie können manuell schreiben',
-      loadHistory: '🕓 Aus Verlauf laden',
+      loadHistory: 'Aus Verlauf laden',
       loadingHistory: 'Wird geladen...',
       analyzeBtn: 'Auswirkungsanalyse starten',
       analyzingBtn: 'KI analysiert...',
@@ -133,13 +138,6 @@ export default function ImpactPage() {
     setLoading(false)
   }
 
-  async function handleCopy() {
-    if (!result) return
-    await navigator.clipboard.writeText(JSON.stringify(result, null, 2))
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
   const inputStyle = {
     width: '100%',
     padding: '10px 12px',
@@ -160,14 +158,19 @@ export default function ImpactPage() {
   }
 
   const getRiskColor = (level: string) => riskColors[level] || accent
-  const getRiskIcon = (level: string) => ['KRİTİK', 'KRITIK', 'CRITICAL'].includes(level) ? '🚨' : ['YÜKSEK', 'YUKSEK', 'HIGH'].includes(level) ? '⚠️' : ['ORTA', 'MEDIUM'].includes(level) ? '🟡' : '✅'
+  const getRiskIconComp = (level: string): LucideIcon =>
+    ['KRİTİK', 'KRITIK', 'CRITICAL'].includes(level) ? AlertOctagon
+      : ['YÜKSEK', 'YUKSEK', 'HIGH'].includes(level) ? AlertTriangle
+        : ['ORTA', 'MEDIUM'].includes(level) ? AlertCircle
+          : CheckCircle2
+  const riskIconEl = (level: string, size: number) => {
+    const Ic = getRiskIconComp(level)
+    return <Ic size={size} color={getRiskColor(level)} />
+  }
 
   return (
     <div>
-      <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: '800', color: colors.text, marginBottom: '4px' }}>{s.title}</h2>
-        <p style={{ fontSize: '13px', color: colors.textMuted }}>{s.desc}</p>
-      </div>
+      <PageHeader title={s.title} desc={s.desc} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: '16px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
@@ -208,9 +211,9 @@ export default function ImpactPage() {
 
           <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '16px' }}>
             <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted, marginBottom: '10px' }}>{s.howTitle}</div>
-            {['🔍', '🗂️', '🗄️', '✅', '⚠️'].map((icon, i) => (
+            {[Search, FolderTree, Database, CheckCircle2, AlertTriangle].map((Ic, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: i < 4 ? `0.5px solid ${colors.border}` : 'none' }}>
-                <span style={{ fontSize: '14px' }}>{icon}</span>
+                <span style={{ display: 'flex', color: colors.textMuted }}><Ic size={14} /></span>
                 <span style={{ fontSize: '12px', color: colors.textMuted }}>{s.howSteps[i]}</span>
               </div>
             ))}
@@ -220,7 +223,7 @@ export default function ImpactPage() {
         <div>
           {!result && !loading && (
             <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '12px' }}>
-              <div style={{ fontSize: '52px', opacity: 0.2 }}>🔬</div>
+              <FlaskConical size={44} style={{ opacity: 0.2 }} />
               <div style={{ fontSize: '14px', color: colors.textMuted, textAlign: 'center' }}>{s.emptyTitle}</div>
               <div style={{ fontSize: '12px', color: colors.textMuted, textAlign: 'center', opacity: 0.7 }}>{s.emptyDesc}</div>
             </div>
@@ -228,7 +231,7 @@ export default function ImpactPage() {
 
           {loading && (
             <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '16px' }}>
-              <div style={{ fontSize: '40px' }}>🔍</div>
+              <Loader2 size={36} style={{ animation: 'pulse 1.5s infinite' }} />
               <div style={{ fontSize: '14px', color: colors.text }}>{s.analyzingTitle}</div>
               {s.analyzingSteps.map((step, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -242,17 +245,15 @@ export default function ImpactPage() {
           {result && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
               <div style={{ background: colors.card, border: `2px solid ${getRiskColor(result.riskLevel)}`, borderRadius: '12px', padding: '16px', display: 'flex', alignItems: 'center', gap: '12px' }}>
-                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: getRiskColor(result.riskLevel) + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px', flexShrink: 0 }}>
-                  {getRiskIcon(result.riskLevel)}
+                <div style={{ width: '48px', height: '48px', borderRadius: '12px', background: getRiskColor(result.riskLevel) + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                  {riskIconEl(result.riskLevel, 24)}
                 </div>
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: '11px', color: colors.textMuted, marginBottom: '2px' }}>{s.riskLabel}</div>
                   <div style={{ fontSize: '18px', fontWeight: '800', color: getRiskColor(result.riskLevel) }}>{result.riskLevel}</div>
                   <div style={{ fontSize: '12px', color: colors.textMuted, marginTop: '2px' }}>{result.summary}</div>
                 </div>
-                <button onClick={handleCopy} style={{ padding: '6px 12px', borderRadius: '8px', border: `0.5px solid ${colors.border}`, background: colors.bg, color: colors.text, fontSize: '11px', cursor: 'pointer' }}>
-                  {copied ? '✅' : '📋'}
-                </button>
+                <CopyButton getText={() => JSON.stringify(result, null, 2)} />
               </div>
 
               {result.affectedModules?.length > 0 && (
@@ -261,8 +262,8 @@ export default function ImpactPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
                     {result.affectedModules.map((mod: any, i: number) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px', borderRadius: '8px', background: colors.bg }}>
-                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: getRiskColor(mod.risk) + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px', flexShrink: 0 }}>
-                          {getRiskIcon(mod.risk)}
+                        <div style={{ width: '28px', height: '28px', borderRadius: '6px', background: getRiskColor(mod.risk) + '22', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                          {riskIconEl(mod.risk, 14)}
                         </div>
                         <div style={{ flex: 1 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
@@ -283,7 +284,7 @@ export default function ImpactPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {result.databaseImpact.map((db: any, i: number) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '10px', padding: '10px', borderRadius: '8px', background: colors.bg }}>
-                        <span style={{ fontSize: '16px' }}>🗄️</span>
+                        <Database size={16} color={colors.textMuted} style={{ flexShrink: 0 }} />
                         <div>
                           <div style={{ fontSize: '13px', fontWeight: '700', color: colors.text, fontFamily: 'monospace' }}>{db.table}</div>
                           <div style={{ fontSize: '12px', color: colors.textMuted }}>{db.change}</div>
@@ -300,7 +301,7 @@ export default function ImpactPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     {result.testCases.map((tc: string, i: number) => (
                       <div key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', padding: '8px 10px', borderRadius: '8px', background: colors.bg }}>
-                        <span style={{ fontSize: '14px', flexShrink: 0 }}>✅</span>
+                        <CheckCircle2 size={14} color="#10b981" style={{ flexShrink: 0, marginTop: '1px' }} />
                         <span style={{ fontSize: '12px', color: colors.text }}>{tc}</span>
                       </div>
                     ))}

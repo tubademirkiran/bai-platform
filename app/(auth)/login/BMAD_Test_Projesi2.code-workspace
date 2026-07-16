@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "../../../../BMAD_Test_Projesi2"
+		}
+	],
+	"settings": {
+		"chat.utilityModel": "saka/glm-5.2",
+		"chat.utilitySmallModel": "saka/glm-5.2"
+	}
+}

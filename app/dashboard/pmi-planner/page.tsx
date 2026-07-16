@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
+import { PageHeader } from '@/components/ui/page-header'
+import { Target, Clock, Users, AlertTriangle, Building2, Check, type LucideIcon } from 'lucide-react'
 // Geçmişe kayıt server tarafında (API route) yapılıyor.
 
 type Methodology = 'waterfall' | 'agile' | 'hybrid'
@@ -50,27 +52,20 @@ export default function PMIPlannerPage() {
     color: colors.text, fontSize: '12px', outline: 'none', marginBottom: '12px'
   }
 
-  const tabs = [
-    { key: 'scope', label: lang === 'tr' ? '🎯 Kapsam & WBS' : '🎯 Scope & WBS' },
-    { key: 'schedule', label: lang === 'tr' ? '⏳ Zaman & Maliyet' : '⏳ Schedule & Cost' },
-    { key: 'stakeholders', label: lang === 'tr' ? '👥 Paydaş & RACI' : '👥 Stakeholder & RACI' },
-    { key: 'risks', label: lang === 'tr' ? '⚠️ Risk & Kalite' : '⚠️ Risk & Quality' },
+  const tabs: { key: Tab; label: string; icon: LucideIcon }[] = [
+    { key: 'scope', label: lang === 'tr' ? 'Kapsam & WBS' : 'Scope & WBS', icon: Target },
+    { key: 'schedule', label: lang === 'tr' ? 'Zaman & Maliyet' : 'Schedule & Cost', icon: Clock },
+    { key: 'stakeholders', label: lang === 'tr' ? 'Paydaş & RACI' : 'Stakeholder & RACI', icon: Users },
+    { key: 'risks', label: lang === 'tr' ? 'Risk & Kalite' : 'Risk & Quality', icon: AlertTriangle },
   ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      {/* Header */}
-      <div>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-          <h2 style={{ fontSize: '20px', fontWeight: '800', color: colors.text, margin: 0 }}>
-            {lang === 'tr' ? 'PMI Proje Planlama Sihirbazı' : 'PMI Project Planning Wizard'}
-          </h2>
-          <span style={{ fontSize: '10px', fontWeight: '700', padding: '3px 10px', borderRadius: '20px', background: accent + '22', color: accent }}>PMBOK v7</span>
-        </div>
-        <p style={{ fontSize: '13px', color: colors.textMuted, marginTop: '4px' }}>
-          {lang === 'tr' ? 'Uluslararası standartlarda (PMI) proje başlatma belgesi ve master plan üretin.' : 'Generate project charter and master plan based on PMI standards.'}
-        </p>
-      </div>
+      <PageHeader
+        title={lang === 'tr' ? 'PMI Proje Planlama Sihirbazı' : 'PMI Project Planning Wizard'}
+        badge="PMBOK v7"
+        desc={lang === 'tr' ? 'Uluslararası standartlarda (PMI) proje başlatma belgesi ve master plan üretin.' : 'Generate project charter and master plan based on PMI standards.'}
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '16px', alignItems: 'start' }}>
         
@@ -124,7 +119,7 @@ export default function PMIPlannerPage() {
             disabled={loading || !form.projectName}
             style={{ width: '100%', padding: '12px', borderRadius: '8px', border: 'none', background: accent, color: '#fff', fontWeight: '700', cursor: loading ? 'not-allowed' : 'pointer' }}
           >
-            {loading ? '⚙️ Plan Hazırlanıyor...' : '🏛️ Projeyi Planla'}
+            {loading ? 'Plan Hazırlanıyor...' : 'Projeyi Planla'}
           </button>
         </div>
 
@@ -145,7 +140,7 @@ export default function PMIPlannerPage() {
                       transition: 'all 0.2s'
                     }}
                   >
-                    {tab.label}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}><tab.icon size={14} /> {tab.label}</span>
                   </button>
                 ))}
               </div>
@@ -156,8 +151,8 @@ export default function PMIPlannerPage() {
                 {/* TAB 1: SCOPE */}
                 {activeTab === 'scope' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                    <Section title="🎯 In-Scope (Kapsam Dahili)" items={result.scope.in} color="#10b981" />
-                    <Section title="🚫 Out-of-Scope (Kapsam Dışı)" items={result.scope.out} color="#ef4444" />
+                    <Section title="In-Scope (Kapsam Dahili)" items={result.scope.in} color="#10b981" />
+                    <Section title="Out-of-Scope (Kapsam Dışı)" items={result.scope.out} color="#ef4444" />
                     <WBSStructure data={result.scope.wbs} accent={accent} colors={colors} />
                   </div>
                 )}
@@ -167,7 +162,7 @@ export default function PMIPlannerPage() {
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
                       <div style={{ background: colors.bg, padding: '16px', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
-                        <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: accent }}>🕒 Milestones (Kilometre Taşları)</h4>
+                        <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: accent }}>Milestones (Kilometre Taşları)</h4>
                         {result.schedule.milestones.map((m: any, i: number) => (
                           <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', padding: '6px 0', borderBottom: `1px solid ${colors.border}55` }}>
                             <span style={{ color: colors.text }}>{m.event}</span>
@@ -176,7 +171,7 @@ export default function PMIPlannerPage() {
                         ))}
                       </div>
                       <div style={{ background: colors.bg, padding: '16px', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
-                        <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#f59e0b' }}>💰 Bütçe Dağılımı</h4>
+                        <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#f59e0b' }}>Bütçe Dağılımı</h4>
                         {result.schedule.budget_breakdown.map((b: any, i: number) => (
                           <div key={i} style={{ marginBottom: '10px' }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginBottom: '4px' }}>
@@ -196,7 +191,7 @@ export default function PMIPlannerPage() {
                 {/* TAB 3: STAKEHOLDERS */}
                 {activeTab === 'stakeholders' && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-                     <h4 style={{ margin: 0, fontSize: '14px', color: accent }}>📋 RACI Matrisi</h4>
+                     <h4 style={{ margin: 0, fontSize: '14px', color: accent }}>RACI Matrisi</h4>
                      <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '12px' }}>
                         <thead>
                           <tr style={{ textAlign: 'left', borderBottom: `2px solid ${colors.border}` }}>
@@ -230,7 +225,7 @@ export default function PMIPlannerPage() {
                 {activeTab === 'risks' && (
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
                     <div>
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#ef4444' }}>⚠️ Kritik Riskler & Önleme</h4>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#ef4444' }}>Kritik Riskler & Önleme</h4>
                       {result.risks.items.map((r: any, i: number) => (
                         <div key={i} style={{ marginBottom: '12px', padding: '10px', background: colors.bg, borderRadius: '8px', borderLeft: `3px solid #ef4444` }}>
                           <div style={{ fontWeight: '700', fontSize: '12px', color: colors.text }}>{r.risk}</div>
@@ -239,10 +234,10 @@ export default function PMIPlannerPage() {
                       ))}
                     </div>
                     <div>
-                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#10b981' }}>✅ Kabul Kriterleri</h4>
+                      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: '#10b981' }}>Kabul Kriterleri</h4>
                       {result.risks.acceptance.map((a: string, i: number) => (
                         <div key={i} style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '8px', fontSize: '12px', color: colors.text }}>
-                          <span style={{ color: '#10b981' }}>✔</span> {a}
+                          <Check size={14} color="#10b981" style={{ flexShrink: 0 }} /> {a}
                         </div>
                       ))}
                     </div>
@@ -253,7 +248,7 @@ export default function PMIPlannerPage() {
             </>
           ) : (
             <div style={{ background: colors.card, border: `1px dashed ${colors.border}`, borderRadius: '12px', height: '400px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: colors.textMuted }}>
-              <div style={{ fontSize: '48px', marginBottom: '16px', opacity: 0.3 }}>🏛️</div>
+              <Building2 size={44} style={{ marginBottom: '16px', opacity: 0.3 }} />
               <div style={{ fontSize: '14px', fontWeight: '600' }}>Proje detaylarını girin ve PMI standartlarında plan oluşturun.</div>
             </div>
           )}
@@ -282,7 +277,7 @@ function Section({ title, items, color }: any) {
 function WBSStructure({ data, accent, colors }: any) {
   return (
     <div style={{ background: colors.bg, padding: '16px', borderRadius: '12px', border: `1px solid ${colors.border}` }}>
-      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: accent }}>🏗️ WBS (İş Kırılım Yapısı)</h4>
+      <h4 style={{ margin: '0 0 12px 0', fontSize: '14px', color: accent }}>WBS (İş Kırılım Yapısı)</h4>
       {data.map((node: any, i: number) => (
         <div key={i} style={{ marginBottom: '10px' }}>
           <div style={{ fontWeight: '700', fontSize: '12px', color: accent }}>{node.phase}</div>

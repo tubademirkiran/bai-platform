@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createContext, useContext, useState, useEffect, useMemo, ReactNode } from 'react'
 // DÜZELTME 1: './i18n' yerine kesin yol olan '@/lib/i18n' kullanıyoruz.
 import { translations, Language } from '@/lib/i18n'
 
@@ -99,13 +99,25 @@ export function ThemeProvider({
   const isDark = mode === 'dark'
   const safeLang = translations[lang] ? lang : 'tr'
 
-  const colors = {
-    bg: isDark ? '#0f0f13' : '#f8fafc',
-    card: isDark ? '#18181b' : '#ffffff',
-    border: isDark ? '#27272a' : '#e2e8f0',
-    text: isDark ? '#f1f5f9' : '#0f172a',
-    textMuted: '#64748b',
-  }
+  // Ekran okuyucular ve tarayıcı için <html lang> değerini seçili dile bağla.
+  useEffect(() => {
+    document.documentElement.lang = safeLang
+  }, [safeLang])
+  // Not: dark sınıfı ve marka CSS değişkenleri dashboard wrapper'ına scoped
+  // uygulanır (bkz. dashboard/layout.tsx) — auth sayfalarına sızmaması için.
+
+  // textMuted artık moda duyarlı — WCAG AA kontrastı için koyulaştırıldı.
+  // (Önceki sabit #64748b koyu kart üzerinde ~3.5:1 ile AA altındaydı.)
+  const colors = useMemo(
+    () => ({
+      bg: isDark ? '#0f0f13' : '#f8fafc',
+      card: isDark ? '#18181b' : '#ffffff',
+      border: isDark ? '#27272a' : '#e2e8f0',
+      text: isDark ? '#f1f5f9' : '#0f172a',
+      textMuted: isDark ? '#94a3b8' : '#475569',
+    }),
+    [isDark]
+  )
 
   if (!mounted) {
     return (

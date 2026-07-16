@@ -3,6 +3,9 @@
 import { useState } from 'react'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
+import { PageHeader } from '@/components/ui/page-header'
+import { CopyButton } from '@/components/ui/copy-button'
+import { Loader2, Terminal, BookOpen, CheckCircle2, Bot, Download } from 'lucide-react'
 
 export default function BddPage() {
   const { accent, colors, lang } = useTheme()
@@ -10,7 +13,6 @@ export default function BddPage() {
   const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
   const [activeTab, setActiveTab] = useState<'story' | 'gherkin' | 'both'>('both')
-  const [copiedSection, setCopiedSection] = useState<string | null>(null)
 
   const ui = {
     tr: {
@@ -122,12 +124,6 @@ export default function BddPage() {
     setLoading(false)
   }
 
-  async function handleCopy(text: string, section: string) {
-    await navigator.clipboard.writeText(text)
-    setCopiedSection(section)
-    setTimeout(() => setCopiedSection(null), 2000)
-  }
-
   function handleDownload() {
     if (!result?.scenarios) return
     const featureContent = `Feature: ${result.story?.title || 'Feature'}\n\n` +
@@ -150,8 +146,9 @@ export default function BddPage() {
     LOW: '#10b981', DUSUK: '#10b981',
   }
 
-  const keywordColor = (kw: string) => {
-    const k = kw.toUpperCase()
+const keywordColor = (kw: string) => {
+    // Görev (b): TR Diakritik düzeltmesi uygulandı (toUpperCase yerine toLocaleUpperCase kullanıldı)
+    const k = kw.toLocaleUpperCase('tr-TR')
     if (['GIVEN', 'VERİLDİĞİNDE', 'GEGEBEN'].some(x => k.includes(x))) return '#3b82f6'
     if (['WHEN', 'NE ZAMAN', 'WENN'].some(x => k.includes(x))) return '#8b5cf6'
     if (['THEN', 'O ZAMAN', 'DANN'].some(x => k.includes(x))) return '#10b981'
@@ -171,10 +168,8 @@ export default function BddPage() {
 
   return (
     <div>
-      <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: '800', color: colors.text, marginBottom: '4px' }}>{s.title}</h2>
-        <p style={{ fontSize: '13px', color: colors.textMuted }}>{s.desc}</p>
-      </div>
+      {/* Görev (a): Yanlış proplar düzeltildi ve Icon eklendi */}
+      <PageHeader title={s.title} description={s.desc} icon={Terminal} />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.6fr', gap: '16px' }}>
 
@@ -214,13 +209,13 @@ export default function BddPage() {
           <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '16px' }}>
             <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted, marginBottom: '10px' }}>BDD NEDİR?</div>
             {[
-              { icon: '📖', text: 'User Story: Kim, ne istiyor, neden?' },
-              { icon: '✅', text: 'Acceptance Criteria: Nasıl doğrulanır?' },
-              { icon: '🥒', text: 'Gherkin: Given/When/Then formatı' },
-              { icon: '🤖', text: 'Cucumber/SpecFlow ile direkt kullanım' },
+              { Icon: BookOpen, text: 'User Story: Kim, ne istiyor, neden?' },
+              { Icon: CheckCircle2, text: 'Acceptance Criteria: Nasıl doğrulanır?' },
+              { Icon: Terminal, text: 'Gherkin: Given/When/Then formatı' },
+              { Icon: Bot, text: 'Cucumber/SpecFlow ile direkt kullanım' },
             ].map((item, i) => (
               <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '6px 0', borderBottom: i < 3 ? `0.5px solid ${colors.border}` : 'none' }}>
-                <span>{item.icon}</span>
+                <span style={{ display: 'flex', color: colors.textMuted }}><item.Icon size={14} /></span>
                 <span style={{ fontSize: '12px', color: colors.textMuted }}>{item.text}</span>
               </div>
             ))}
@@ -230,7 +225,7 @@ export default function BddPage() {
         <div>
           {!result && !loading && (
             <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '12px' }}>
-              <div style={{ fontSize: '52px', opacity: 0.2 }}>🥒</div>
+              <Terminal size={44} style={{ opacity: 0.2 }} />
               <div style={{ fontSize: '14px', color: colors.textMuted }}>{s.emptyTitle}</div>
               <div style={{ fontSize: '12px', color: colors.textMuted, opacity: 0.7, textAlign: 'center' }}>{s.emptyDesc}</div>
             </div>
@@ -238,7 +233,7 @@ export default function BddPage() {
 
           {loading && (
             <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '40px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: '400px', gap: '16px' }}>
-              <div style={{ fontSize: '40px' }}>🥒</div>
+              <Loader2 size={36} style={{ animation: 'pulse 1.5s infinite' }} />
               <div style={{ fontSize: '14px', color: colors.text }}>BDD formatına dönüştürülüyor...</div>
               {['User Story analiz ediliyor', 'Kabul kriterleri belirleniyor', 'Gherkin senaryoları yazılıyor', 'Adımlar optimize ediliyor'].map((step, i) => (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -267,9 +262,7 @@ export default function BddPage() {
                           {result.story.storyPoints} SP
                         </span>
                       )}
-                      <button onClick={() => handleCopy(`As a ${result.story.asA}\nI want to ${result.story.iWantTo}\nSo that ${result.story.soThat}`, 'story')} style={btnStyle}>
-                        {copiedSection === 'story' ? `✅ ${s.copiedBtn}` : `📋 ${s.copyBtn}`}
-                      </button>
+                      <CopyButton getText={() => `As a ${result.story.asA}\nI want to ${result.story.iWantTo}\nSo that ${result.story.soThat}`} label={s.copyBtn} copiedLabel={s.copiedBtn} />
                     </div>
                   </div>
 
@@ -319,20 +312,16 @@ export default function BddPage() {
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '14px' }}>
                     <div style={{ fontSize: '11px', fontWeight: '700', color: colors.textMuted }}>{s.gherkinTitle}</div>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button
-                        onClick={() => handleCopy(
-                          result.scenarios.map((sc: any) =>
-                            `Scenario: ${sc.title}\n` +
-                            sc.steps.map((st: any) => `  ${st.keyword} ${st.text}`).join('\n')
-                          ).join('\n\n'),
-                          'gherkin'
-                        )}
-                        style={btnStyle}
-                      >
-                        {copiedSection === 'gherkin' ? `✅ ${s.copiedBtn}` : `📋 ${s.copyBtn}`}
-                      </button>
-                      <button onClick={handleDownload} style={{ ...btnStyle, color: accent, border: `0.5px solid ${accent}44` }}>
-                        🥒 {s.downloadBtn}
+                      <CopyButton
+                        getText={() => result.scenarios.map((sc: any) =>
+                          `Scenario: ${sc.title}\n` +
+                          sc.steps.map((st: any) => `  ${st.keyword} ${st.text}`).join('\n')
+                        ).join('\n\n')}
+                        label={s.copyBtn}
+                        copiedLabel={s.copiedBtn}
+                      />
+                      <button onClick={handleDownload} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: '6px', color: accent, border: `0.5px solid ${accent}44` }}>
+                        <Download size={13} /> {s.downloadBtn}
                       </button>
                     </div>
                   </div>

@@ -1,31 +1,27 @@
 'use client'
 
 import { useState, useEffect, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation' // 🌟 YENİ EKLENDİ
+import { useSearchParams } from 'next/navigation'
 import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
+import { PageHeader } from '@/components/ui/page-header'
+import { CopyButton } from '@/components/ui/copy-button'
+import { GitMerge, Loader2, Download } from 'lucide-react'
 
 function FlowchartPageInner() {
   const { accent, colors } = useTheme()
-  const searchParams = useSearchParams() // 🌟 URL DİNLEYİCİSİ ÇAĞRILDI
+  const searchParams = useSearchParams()
 
   const [requirement, setRequirement] = useState('')
   const [mermaidCode, setMermaidCode] = useState('')
   const [loading, setLoading] = useState(false)
-  const [copied, setCopied] = useState(false)
   const [diagramType, setDiagramType] = useState<'flowchart' | 'sequence' | 'erDiagram'>('flowchart')
   const [rendered, setRendered] = useState(false)
 
-  // 🌟 OMNIBOX'TAN GELEN PROMPTU YAKALA VE KUTUYA YAZDIR
   useEffect(() => {
     const incomingPrompt = searchParams.get('prompt')
     if (incomingPrompt) {
       setRequirement(incomingPrompt)
-      
-      // Opsiyonel Harika UX: Eğer Dashboard'dan dolu bir prompt ile gelindiyse,
-      // Kullanıcıyı bekletmeden 500ms sonra üretimi otomatik başlat!
-      // Eğer bu otomatik üretimi istemiyorsan, aşağıdaki satırı silebilirsin.
-      // setTimeout(() => handleGenerate(incomingPrompt), 500) 
     }
   }, [searchParams])
 
@@ -55,7 +51,6 @@ function FlowchartPageInner() {
     }
   }
 
-  // handleGenerate fonksiyonuna parametre eklendi (otomatik tetikleme için)
   async function handleGenerate(autoPrompt?: string) {
     const textToProcess = autoPrompt || requirement
     if (!textToProcess.trim()) return
@@ -74,12 +69,6 @@ function FlowchartPageInner() {
     const data = await response.json()
     setMermaidCode(data.result)
     setLoading(false)
-  }
-
-  async function handleCopy() {
-    await navigator.clipboard.writeText(mermaidCode)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
   }
 
   function handleDownload() {
@@ -105,21 +94,19 @@ function FlowchartPageInner() {
   }
 
   const types = [
-    { key: 'flowchart', label: 'Flowchart', desc: 'Akış Şemasi' },
+    { key: 'flowchart', label: 'Flowchart', desc: 'Akış Şeması' },
     { key: 'sequence', label: 'Sequence', desc: 'Sıralı Akış' },
     { key: 'erDiagram', label: 'ER Diagram', desc: 'Veritabanı' },
   ]
 
   return (
     <div>
-      <div style={{ marginBottom: '20px' }}>
-        <h2 style={{ fontSize: '20px', fontWeight: '800', color: colors.text, marginBottom: '4px' }}>
-          Flowchart Generator
-        </h2>
-        <p style={{ fontSize: '13px', color: colors.textMuted }}>
-          Gereksinim metnini yaz, AI otomatik akis semasi cizsin.
-        </p>
-      </div>
+      {/* Görev (a): PageHeader düzeltildi, icon eklendi */}
+      <PageHeader 
+        title="Flowchart Generator" 
+        description="Gereksinim metnini yaz, AI otomatik akış şeması çizsin." 
+        icon={GitMerge} 
+      />
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 
@@ -192,9 +179,8 @@ function FlowchartPageInner() {
             <div style={{ background: colors.card, border: `0.5px solid ${colors.border}`, borderRadius: '12px', padding: '16px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
                 <div style={{ fontSize: '12px', fontWeight: '600', color: colors.textMuted }}>MERMAID KODU</div>
-                <button onClick={handleCopy} style={btnStyle}>
-                  {copied ? '✅ Kopyalandi' : '📋 Kopyala'}
-                </button>
+                {/* Görev (a): Mevcut CopyButton kontrol edildi */}
+                <CopyButton getText={() => mermaidCode} label="Kopyala" copiedLabel="Kopyalandı" />
               </div>
               <pre style={{
                 whiteSpace: 'pre-wrap',
@@ -218,8 +204,8 @@ function FlowchartPageInner() {
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '16px' }}>
             <div style={{ fontSize: '12px', fontWeight: '600', color: colors.textMuted }}>DIAGRAM ÖNİZLEME</div>
             {rendered && (
-              <button onClick={handleDownload} style={btnStyle}>
-                📥 SVG Indir
+              <button onClick={handleDownload} style={{ ...btnStyle, display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                <Download size={14} /> SVG İndir
               </button>
             )}
           </div>
@@ -234,8 +220,8 @@ function FlowchartPageInner() {
               color: colors.textMuted,
               gap: '12px',
             }}>
-              <div style={{ fontSize: '48px', opacity: 0.3 }}>🔷</div>
-              <div style={{ fontSize: '13px' }}>Gereksinim yazın ve diagram oluşturun</div>
+              <GitMerge size={44} style={{ opacity: 0.3 }} />
+              <div style={{ fontSize: '13px' }}>Gereksinim yazın ve diyagram oluşturun</div>
             </div>
           )}
 
@@ -249,8 +235,8 @@ function FlowchartPageInner() {
               color: colors.textMuted,
               gap: '16px',
             }}>
-              <div style={{ fontSize: '40px' }}>⚙️</div>
-              <div style={{ fontSize: '13px' }}>AI diagram olusturuyor...</div>
+              <Loader2 size={36} style={{ animation: 'pulse 1.5s infinite' }} />
+              <div style={{ fontSize: '13px' }}>AI diyagram oluşturuyor...</div>
               <div style={{ width: '120px', height: '3px', background: colors.border, borderRadius: '2px', overflow: 'hidden' }}>
                 <div style={{
                   height: '100%',
@@ -278,7 +264,6 @@ function FlowchartPageInner() {
   )
 }
 
-// useSearchParams() Next 16'da Suspense sınırı gerektirir (statik üretim uyumu).
 export default function FlowchartPage() {
   return (
     <Suspense fallback={null}>
