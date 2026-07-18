@@ -12,11 +12,13 @@ const themes = {
 
 type ThemeKey = 'purple' | 'green' | 'orange'
 type Mode = 'light' | 'dark'
+export type FontSize = 'sm' | 'base' | 'lg'
 
 interface ThemeContextType {
   theme: ThemeKey
   mode: Mode
   lang: Language
+  fontSize: FontSize
   accent: string
   soft: string
   isDark: boolean
@@ -31,12 +33,19 @@ interface ThemeContextType {
   setTheme: (theme: ThemeKey) => void
   setMode: (mode: Mode) => void
   setLang: (lang: Language) => void
+  setFontSize: (size: FontSize) => void
+  // Türkçe karakter hatalarını kökten çözen asistanlar
+  utils: {
+    toUpperCaseTr: (str: string) => string
+    toLowerCaseTr: (str: string) => string
+  }
 }
 
 const ThemeContext = createContext<ThemeContextType>({
   theme: 'purple',
   mode: 'dark',
   lang: 'tr',
+  fontSize: 'base',
   accent: '#7c3aed',
   soft: '#f5f3ff',
   isDark: true,
@@ -51,6 +60,11 @@ const ThemeContext = createContext<ThemeContextType>({
   setTheme: () => {},
   setMode: () => {},
   setLang: () => {},
+  setFontSize: () => {},
+  utils: {
+    toUpperCaseTr: (str) => str.toUpperCase(),
+    toLowerCaseTr: (str) => str.toLowerCase(),
+  }
 })
 
 export function ThemeProvider({
@@ -58,15 +72,18 @@ export function ThemeProvider({
   theme: initialTheme = 'purple',
   mode: initialMode = 'dark',
   lang: initialLang = 'tr',
+  fontSize: initialFontSize = 'base',
 }: {
   children: ReactNode
   theme?: ThemeKey
   mode?: Mode
   lang?: Language
+  fontSize?: FontSize
 }) {
   const [theme, setTheme] = useState<ThemeKey>(initialTheme)
   const [mode, setMode] = useState<Mode>(initialMode)
   const [lang, setLang] = useState<Language>(initialLang)
+  const [fontSize, setFontSize] = useState<FontSize>(initialFontSize)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -74,10 +91,12 @@ export function ThemeProvider({
       const savedTheme = localStorage.getItem('bai-theme') as ThemeKey
       const savedMode = localStorage.getItem('bai-mode') as Mode
       const savedLang = localStorage.getItem('bai-lang') as Language
+      const savedFontSize = localStorage.getItem('bai-font-size') as FontSize
 
       if (savedTheme && Object.keys(themes).includes(savedTheme)) setTheme(savedTheme)
       if (savedMode && (savedMode === 'dark' || savedMode === 'light')) setMode(savedMode)
       if (savedLang && ['tr', 'en', 'de'].includes(savedLang)) setLang(savedLang)
+      if (savedFontSize && ['sm', 'base', 'lg'].includes(savedFontSize)) setFontSize(savedFontSize)
     } catch (error) {
       console.warn("LocalStorage okunamadı, varsayılan ayarlara dönülüyor.")
     }
@@ -89,12 +108,13 @@ export function ThemeProvider({
       localStorage.setItem('bai-theme', theme)
       localStorage.setItem('bai-mode', mode)
       localStorage.setItem('bai-lang', lang)
+      localStorage.setItem('bai-font-size', fontSize)
     }
-  }, [theme, mode, lang, mounted])
+  }, [theme, mode, lang, fontSize, mounted])
 
-  // DÜZELTME 2: GÜVENLİK ÖNLEMİ (Eski kırık veriler sistemi çökertmesin diye)
+  // DÜZELTME 2: GÜVENLİK ÖNLEMİ
   const safeThemeKey = themes[theme] ? theme : 'purple'
-  const t = themes[safeThemeKey]
+  const tData = themes[safeThemeKey]
   
   const isDark = mode === 'dark'
   const safeLang = translations[lang] ? lang : 'tr'
@@ -103,11 +123,26 @@ export function ThemeProvider({
   useEffect(() => {
     document.documentElement.lang = safeLang
   }, [safeLang])
-  // Not: dark sınıfı ve marka CSS değişkenleri dashboard wrapper'ına scoped
-  // uygulanır (bkz. dashboard/layout.tsx) — auth sayfalarına sızmaması için.
 
-  // textMuted artık moda duyarlı — WCAG AA kontrastı için koyulaştırıldı.
-  // (Önceki sabit #64748b koyu kart üzerinde ~3.5:1 ile AA altındaydı.)
+  // Türkçe karakter büyüteç/küçülteç dönüştürücüleri (ı-I ve i-İ hatalarını engeller)
+  const utils = useMemo(() => ({
+    toUpperCaseTr: (str: string) => {
+      if (!str) return ''
+      return str.replace(/i/g, 'İ').replace(/ı/g, 'I').toUpperCase()
+    },
+    toLowerCaseTr: (str: string) => {
+      if (!str) return ''
+      return str.replace(/İ/g, 'i').replace(/I/g, 'ı').toLowerCase()
+    }
+  }), [])
+
+  // Yazı boyutu piksel haritası
+  const fontSizeMap = {
+    sm: '13px',
+    base: '15px',
+    lg: '17px'
+  }
+
   const colors = useMemo(
     () => ({
       bg: isDark ? '#0f0f13' : '#f8fafc',
@@ -119,37 +154,48 @@ export function ThemeProvider({
     [isDark]
   )
 
+  const contextValue = {
+    theme: safeThemeKey, 
+    mode, 
+    lang: safeLang,
+    fontSize,
+    accent: tData.accent, 
+    soft: tData.soft, 
+    isDark, 
+    t: translations[safeLang], 
+    colors,
+    setTheme, 
+    setMode, 
+    setLang,
+    setFontSize,
+    utils
+  }
+
+  // Yazı boyutunun tüm uygulamada senkronize ve akıcı değişmesi için geçişli inline style
+  // Next.js yönlendirmelerinde ezilmemesi adına CSS Değişkeni (--bai-dashboard-font-size) eklendi.
+  const wrapperStyle = {
+    '--bai-dashboard-font-size': fontSizeMap[fontSize],
+    fontSize: fontSizeMap[fontSize],
+    transition: 'font-size 0.2s ease',
+    width: '100%',
+    height: '100%'
+  } as React.CSSProperties
+
   if (!mounted) {
     return (
-      <ThemeContext.Provider value={{
-        theme: safeThemeKey, 
-        mode, 
-        lang: safeLang, 
-        accent: t.accent, 
-        soft: t.soft, 
-        isDark, 
-        t: translations[safeLang], 
-        colors,
-        setTheme, setMode, setLang
-      }}>
-        {children}
+      <ThemeContext.Provider value={contextValue}>
+        <div style={{ fontSize: '15px', width: '100%', height: '100%' }}>
+          {children}
+        </div>
       </ThemeContext.Provider>
     )
   }
 
   return (
-    <ThemeContext.Provider value={{
-      theme: safeThemeKey, 
-      mode, 
-      lang: safeLang,
-      accent: t.accent,
-      soft: t.soft,
-      isDark,
-      t: translations[safeLang],
-      colors,
-      setTheme, setMode, setLang
-    }}>
-      {children}
+    <ThemeContext.Provider value={contextValue}>
+      <div style={wrapperStyle}>
+        {children}
+      </div>
     </ThemeContext.Provider>
   )
 }

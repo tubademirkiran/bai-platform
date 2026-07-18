@@ -7,13 +7,11 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
 import { Loader2, Ticket, Bug, Zap, Tag, User, CheckCircle2, Settings, Ban, Rocket } from 'lucide-react'
-// Geçmişe kayıt server tarafında (API route) yapılıyor.
 
 export default function JiraGeneratorPage() {
   const { accent, colors, lang, isDark } = useTheme()
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<any>(null)
-  const [copied, setCopied] = useState(false)
 
   // Form State
   const [form, setForm] = useState({
@@ -37,7 +35,7 @@ export default function JiraGeneratorPage() {
       })
       const data = await response.json()
       setResult(data.result)
-      // Geçmişe kayıt server tarafında yapılıyor.
+      // Geçmişe kayıt server tarafında (API) yapılıyor.
     } catch (error) {
       console.error(error)
     } finally {
@@ -64,10 +62,11 @@ export default function JiraGeneratorPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '20px', height: '100%' }}>
+      {/* Görev (a): PageHeader icon ve description ile güncellendi */}
       <PageHeader
         title="AI Jira Issue Generator"
-        badge="Agile/Scrum"
-        desc={lang === 'tr' ? 'Ham talepleri Developer-Ready (Geliştirmeye Hazır) teknik Jira biletlerine dönüştürün.' : 'Convert raw requests into Developer-Ready technical Jira tickets.'}
+        description={lang === 'tr' ? 'Ham talepleri Developer-Ready (Geliştirmeye Hazır) teknik Jira biletlerine dönüştürün.' : 'Convert raw requests into Developer-Ready technical Jira tickets.'}
+        icon={Ticket}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '16px', alignItems: 'start', flex: 1 }}>
@@ -162,7 +161,12 @@ export default function JiraGeneratorPage() {
                   </div>
                 </div>
                 <div style={{ display: 'flex', gap: '8px' }}>
-                  <CopyButton getText={buildJiraText} />
+                  {/* Görev (a): CopyButton'a dil seçenekleri (label) eklendi */}
+                  <CopyButton 
+                    getText={buildJiraText} 
+                    label={lang === 'tr' ? 'Kopyala' : 'Copy'} 
+                    copiedLabel={lang === 'tr' ? 'Kopyalandı' : 'Copied'} 
+                  />
                   <button style={{ padding: '6px 12px', borderRadius: '6px', border: 'none', background: '#0052CC', color: '#fff', fontSize: '12px', fontWeight: '600', cursor: 'not-allowed', opacity: 0.7, display: 'inline-flex', alignItems: 'center', gap: '6px' }} title="Jira entegrasyonu yakında eklenecektir.">
                     <Rocket size={13} /> Jira&apos;ya Aktar (Yakında)
                   </button>

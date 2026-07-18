@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { useTheme } from '@/lib/theme-context'
+import { useTheme, FontSize } from '@/lib/theme-context'
 import { Language } from '@/lib/i18n'
 import { MODULES, modulesByCategory, moduleTitle } from '@/lib/modules'
 import { useMediaQuery } from '@/lib/use-media-query'
@@ -13,7 +13,7 @@ import ChatAssistant from '@/components/ui/chat-assistant'
 // UI (navigasyon dışı) ikonlar — modül ikonları artık lib/modules.ts'ten gelir.
 import {
   ChevronDown, ChevronRight, Search, X, Menu,
-  Settings, User, Palette, CreditCard, LogOut, CheckCircle2,
+  Settings, User, Palette, CreditCard, LogOut, CheckCircle2, Type,
 } from 'lucide-react'
 
 const themes = {
@@ -54,7 +54,8 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const pathname = usePathname()
 
-  const { theme, mode, lang, setTheme, setMode, setLang, isDark, colors: c, accent } = useTheme()
+  // useTheme genişletilmiş özellikleri entegre edildi
+  const { theme, mode, lang, fontSize, setTheme, setMode, setLang, setFontSize, utils, isDark, colors: c, accent } = useTheme()
 
   // KLAVYE KISAYOLU (Cmd+K) VE ESCAPE DİNLEYİCİSİ
   useEffect(() => {
@@ -134,7 +135,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
     content: isDark ? '#0f0f13' : '#f8fafc',
   }
 
-  // --- MENÜ VERİ YAPISI (tek kaynak: lib/modules.ts) ---
+  // --- MENÜ VERİ YAPISI ---
   const generalItems = modulesByCategory('general')
   const moduleGroups = [
     { id: 'uretim', title: lang === 'tr' ? 'ÜRETİM' : 'PRODUCTION', items: modulesByCategory('uretim') },
@@ -145,12 +146,11 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   const allSearchItems = MODULES
   const filteredItems = allSearchItems.filter(item =>
-    moduleTitle(item, lang).toLowerCase().includes(searchQuery.toLowerCase())
+    utils.toLowerCaseTr(moduleTitle(item, lang)).includes(utils.toLowerCaseTr(searchQuery))
   )
   const activeModule = allSearchItems.find(m => m.href === pathname)
 
-  // Marka renklerini dashboard alt-ağacına scoped CSS değişkenleri olarak yay.
-  // shadcn token'ları (--primary, --ring, yüzeyler) böylece tek kaynakla senkron.
+  // Marka renkleri Turbopack derleme hatasına karşı tırnaklı (string literal) anahtarlar haline getirildi.
   const brandVars = {
     '--primary': accent,
     '--primary-foreground': '#ffffff',
@@ -170,10 +170,26 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
   const sidebarWidth = 220
 
+  // Yazı boyutuna göre taban font-size eşleşme tablosu
+  const fontSizeMap = {
+    sm: '13px',
+    base: '15px',
+    lg: '17px'
+  }
+
   return (
     <div
       className={isDark ? 'dark' : undefined}
-      style={{ ...brandVars, display: 'flex', height: '100vh', width: '100vw', overflow: 'hidden', background: layoutColors.content }}
+      style={{ 
+        ...brandVars, 
+        display: 'flex', 
+        height: '100vh', 
+        width: '100vw', 
+        overflow: 'hidden', 
+        background: layoutColors.content,
+        fontSize: fontSizeMap[fontSize], // Global taban yazı boyutu eşleşmesi sağlandı
+        transition: 'font-size 0.2s ease'
+      }}
     >
 
       {/* MOBİL OVERLAY */}
@@ -218,7 +234,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
         <nav style={{ flex: 1, padding: '16px 0', overflowY: 'auto' }}>
 
           <div style={{ fontSize: '10px', fontWeight: '800', color: '#475569', padding: '0 20px 8px', letterSpacing: '0.1em' }}>
-            {lang === 'tr' ? 'GENEL' : 'GENERAL'}
+            {utils.toUpperCaseTr(lang === 'tr' ? 'GENEL' : 'GENERAL')}
           </div>
           {generalItems.map((item) => {
             const isActive = pathname === item.href
@@ -236,7 +252,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
                   onClick={() => toggleGroup(group.id)}
                   style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', fontSize: '10px', fontWeight: '800', color: '#475569', padding: '8px 20px', letterSpacing: '0.1em', cursor: 'pointer', userSelect: 'none' }}
                 >
-                  <span>{group.title}</span>
+                  <span>{utils.toUpperCaseTr(group.title)}</span>
                   <span style={{ color: '#64748b', display: 'flex', alignItems: 'center' }}>
                     {expandedGroups[group.id] ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
                   </span>
@@ -259,7 +275,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
           </div>
 
           <div style={{ fontSize: '10px', fontWeight: '800', color: '#475569', padding: '16px 20px 8px', letterSpacing: '0.1em' }}>
-            {lang === 'tr' ? 'DİĞER' : 'OTHER'}
+            {utils.toUpperCaseTr(lang === 'tr' ? 'DİĞER' : 'OTHER')}
           </div>
           {otherItems.map((item) => {
             const isActive = pathname === item.href
@@ -272,8 +288,34 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
 
         </nav>
 
+        {/* ERİŞİLEBİLİRLİK HIZLI PANEL */}
+        <div style={{ padding: '8px 16px', display: 'flex', flexDirection: 'column', gap: '6px', borderTop: `1px solid ${layoutColors.sidebarBorder}` }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', opacity: 0.7 }}>
+            <Type size={12} color="#64748b" />
+            <span style={{ fontSize: '9px', fontWeight: '800', color: '#475569', letterSpacing: '0.04em' }}>
+              {lang === 'tr' ? 'ERİŞİLEBİLİRLİK' : 'ACCESSIBILITY'}
+            </span>
+          </div>
+          <div style={{ display: 'flex', background: 'rgba(0,0,0,0.2)', padding: '2px', borderRadius: '6px', border: `1px solid ${layoutColors.sidebarBorder}` }}>
+            {(['sm', 'base', 'lg'] as const).map((sz) => (
+              <button
+                key={sz}
+                onClick={() => setFontSize(sz)}
+                style={{
+                  flex: 1, padding: '3px 0', fontSize: '10px', fontWeight: '700', borderRadius: '4px', border: 'none', cursor: 'pointer',
+                  background: fontSize === sz ? accent + '25' : 'transparent',
+                  color: fontSize === sz ? accent : '#64748b',
+                  transition: 'all 0.15s ease'
+                }}
+              >
+                {sz.toUpperCase()}
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* ALT PROFİL BUTONU */}
-        <div style={{ padding: '16px', borderTop: `1px solid ${layoutColors.sidebarBorder}` }}>
+        <div style={{ padding: '12px 16px 16px' }}>
           <div
             onClick={() => setIsSettingsOpen(true)}
             style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: 'all 0.2s', background: 'rgba(255,255,255,0.03)' }}
@@ -345,7 +387,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       <ChatAssistant />
 
       {/* ------------------------------------------------------------- */}
-      {/* 1. AYARLAR VE PROFİL MODALI (responsive) */}
+      {/* 1. AYARLAR VE PROFİL MODALI (İçerik Scroll & Header Sabit) */}
       {/* ------------------------------------------------------------- */}
       {isSettingsOpen && (
         <div style={{ position: 'fixed', top: 0, left: 0, width: '100vw', height: '100vh', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
@@ -378,161 +420,193 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               )}
             </div>
 
-            {/* Modal Sağ İçerik Alanı */}
-            <div style={{ flex: 1, padding: isMobile ? '20px' : '32px', position: 'relative', overflowY: 'auto' }}>
-              <button onClick={() => setIsSettingsOpen(false)} aria-label="Kapat" style={{ position: 'absolute', top: '20px', right: '20px', background: 'transparent', border: 'none', color: c.textMuted, cursor: 'pointer', padding: '4px' }}>
-                <X size={24} />
-              </button>
+            {/* Modal Sağ İçerik Alanı (Başlıklar sabit panel haline getirildi, alt alan scroll ediliyor) */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', position: 'relative' }}>
+              
+              {/* SABİT PANEL: Başlık ve Kapatma Butonu */}
+              <div style={{ padding: isMobile ? '20px 20px 12px' : '32px 32px 16px', borderBottom: `1px solid ${isDark ? '#27272a' : '#e2e8f0'}`, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexShrink: 0 }}>
+                <h3 style={{ fontSize: '1.25em', fontWeight: '800', color: c.text, margin: 0 }}>
+                  {activeSettingsTab === 'profile' && (lang === 'tr' ? 'Profil Bilgileri' : 'Profile Information')}
+                  {activeSettingsTab === 'appearance' && (lang === 'tr' ? 'Görünüm Ayarları' : 'Appearance Settings')}
+                  {activeSettingsTab === 'billing' && (lang === 'tr' ? 'Plan ve Kullanım' : 'Plan & Usage')}
+                </h3>
+                <button onClick={() => setIsSettingsOpen(false)} aria-label="Kapat" style={{ background: 'transparent', border: 'none', color: c.textMuted, cursor: 'pointer', padding: '4px', display: 'flex' }}>
+                  <X size={24} />
+                </button>
+              </div>
 
-              {/* SEKME 1: HESABIM */}
-              {activeSettingsTab === 'profile' && (
-                <div style={{ animation: 'fadeIn 0.3s', display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
-                  <h3 style={{ fontSize: '20px', fontWeight: '800', color: c.text, marginBottom: '24px' }}>{lang === 'tr' ? 'Profil Bilgileri' : 'Profile Information'}</h3>
+              {/* YALNIZCA SEKMELERİN İÇERİĞİNİ SCROLL EDEN ALAN */}
+              <div style={{ flex: 1, overflowY: 'auto', padding: isMobile ? '16px 20px' : '24px 32px' }}>
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '32px', paddingBottom: '32px', borderBottom: `1px solid ${isDark ? '#27272a' : '#e2e8f0'}` }}>
-                    <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '32px', fontWeight: '800', boxShadow: `0 8px 25px ${accent}44`, flexShrink: 0 }}>
-                      {user?.email?.[0]?.toUpperCase()}
+                {/* SEKME 1: HESABIM */}
+                {activeSettingsTab === 'profile' && (
+                  <div style={{ animation: 'fadeIn 0.3s', display: 'flex', flexDirection: 'column', minHeight: '100%' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '24px', marginBottom: '32px', paddingBottom: '32px', borderBottom: `1px solid ${isDark ? '#27272a' : '#e2e8f0'}` }}>
+                      <div style={{ width: '80px', height: '80px', borderRadius: '50%', background: accent, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: '32px', fontWeight: '800', boxShadow: `0 8px 25px ${accent}44`, flexShrink: 0 }}>
+                        {user?.email?.[0]?.toUpperCase()}
+                      </div>
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontSize: '0.9em', color: c.textMuted, fontWeight: '600', marginBottom: '4px' }}>E-Posta Adresi</div>
+                        <div style={{ fontSize: '1.1em', color: c.text, fontWeight: '700', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</div>
+                      </div>
                     </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: '14px', color: c.textMuted, fontWeight: '600', marginBottom: '4px' }}>E-Posta Adresi</div>
-                      <div style={{ fontSize: '18px', color: c.text, fontWeight: '700', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user?.email}</div>
-                    </div>
-                  </div>
 
-                  <div style={{ display: 'grid', gap: '20px', maxWidth: '400px' }}>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: c.textMuted, marginBottom: '8px' }}>{lang === 'tr' ? 'Ad Soyad' : 'Full Name'}</label>
-                      <input
-                        type="text"
-                        value={fullName}
-                        onChange={(e) => setFullName(e.target.value)}
-                        placeholder="İsminizi girin"
-                        style={{ width: '100%', background: isDark ? '#18181b' : '#f8fafc', border: `1px solid ${isDark ? '#27272a' : '#cbd5e1'}`, padding: '12px 16px', borderRadius: '10px', color: c.text, fontSize: '14px', outline: `1px solid transparent`, transition: 'all 0.2s' }}
-                        onFocus={e => e.currentTarget.style.outlineColor = accent}
-                        onBlur={e => e.currentTarget.style.outlineColor = 'transparent'}
-                      />
+                    <div style={{ display: 'grid', gap: '20px', maxWidth: '400px' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85em', fontWeight: '600', color: c.textMuted, marginBottom: '8px' }}>{lang === 'tr' ? 'Ad Soyad' : 'Full Name'}</label>
+                        <input
+                          type="text"
+                          value={fullName}
+                          onChange={(e) => setFullName(e.target.value)}
+                          placeholder="İsminizi girin"
+                          style={{ width: '100%', background: isDark ? '#18181b' : '#f8fafc', border: `1px solid ${isDark ? '#27272a' : '#cbd5e1'}`, padding: '12px 16px', borderRadius: '10px', color: c.text, fontSize: '0.95em', outline: `1px solid transparent`, transition: 'all 0.2s' }}
+                          onFocus={e => e.currentTarget.style.outlineColor = accent}
+                          onBlur={e => e.currentTarget.style.outlineColor = 'transparent'}
+                        />
+                      </div>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.85em', fontWeight: '600', color: c.textMuted, marginBottom: '8px' }}>{lang === 'tr' ? 'Şifre Değiştir' : 'Change Password'}</label>
+                        <button style={{ width: '100%', background: 'transparent', border: `1px solid ${isDark ? '#27272a' : '#cbd5e1'}`, color: c.text, padding: '12px 16px', borderRadius: '10px', fontSize: '0.95em', fontWeight: '600', cursor: 'pointer', textAlign: 'left' }}>
+                          {lang === 'tr' ? 'Şifre sıfırlama e-postası gönder' : 'Send reset password email'}
+                        </button>
+                      </div>
                     </div>
-                    <div>
-                      <label style={{ display: 'block', fontSize: '13px', fontWeight: '600', color: c.textMuted, marginBottom: '8px' }}>{lang === 'tr' ? 'Şifre Değiştir' : 'Change Password'}</label>
-                      <button style={{ width: '100%', background: 'transparent', border: `1px solid ${isDark ? '#27272a' : '#cbd5e1'}`, color: c.text, padding: '12px 16px', borderRadius: '10px', fontSize: '14px', fontWeight: '600', cursor: 'pointer', textAlign: 'left' }}>
-                        {lang === 'tr' ? 'Şifre sıfırlama e-postası gönder' : 'Send reset password email'}
-                      </button>
-                    </div>
-                  </div>
 
-                  <div style={{ marginTop: '32px', paddingTop: '32px', display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
-                    {isMobile && (
-                      <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderRadius: '10px', background: '#ef444415', color: '#ef4444', fontWeight: '600', fontSize: '13px', border: 'none', cursor: 'pointer' }}>
-                        <LogOut size={16} /> {lang === 'tr' ? 'Çıkış Yap' : 'Sign Out'}
-                      </button>
-                    )}
-                    <button
-                      onClick={handleSaveProfile}
-                      disabled={isSaving || showSuccess}
-                      style={{
-                        background: showSuccess ? '#10b981' : accent,
-                        color: '#fff',
-                        border: 'none',
-                        padding: '12px 24px',
-                        borderRadius: '10px',
-                        fontSize: '14px',
-                        fontWeight: '700',
-                        cursor: isSaving || showSuccess ? 'default' : 'pointer',
-                        transition: 'all 0.3s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px',
-                        marginLeft: 'auto',
-                      }}
-                    >
-                      {isSaving ? (
-                        <span style={{ animation: 'pulse 1s infinite' }}>{lang === 'tr' ? 'Kaydediliyor...' : 'Saving...'}</span>
-                      ) : showSuccess ? (
-                        <> <CheckCircle2 size={18} /> {lang === 'tr' ? 'Başarıyla Kaydedildi' : 'Successfully Saved'} </>
-                      ) : (
-                        lang === 'tr' ? 'Değişiklikleri Kaydet' : 'Save Changes'
+                    <div style={{ marginTop: 'auto', paddingTop: '32px', display: 'flex', justifyContent: 'space-between', gap: '12px', flexWrap: 'wrap' }}>
+                      {isMobile && (
+                        <button onClick={handleLogout} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderRadius: '10px', background: '#ef444415', color: '#ef4444', fontWeight: '600', fontSize: '0.85em', border: 'none', cursor: 'pointer' }}>
+                          <LogOut size={16} /> {lang === 'tr' ? 'Çıkış Yap' : 'Sign Out'}
+                        </button>
                       )}
+                      <button
+                        onClick={handleSaveProfile}
+                        disabled={isSaving || showSuccess}
+                        style={{
+                          background: showSuccess ? '#10b981' : accent,
+                          color: '#fff',
+                          border: 'none',
+                          padding: '12px 24px',
+                          borderRadius: '10px',
+                          fontSize: '0.95em',
+                          fontWeight: '700',
+                          cursor: isSaving || showSuccess ? 'default' : 'pointer',
+                          transition: 'all 0.3s',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '8px',
+                          marginLeft: 'auto',
+                        }}
+                      >
+                        {isSaving ? (
+                          <span style={{ animation: 'pulse 1s infinite' }}>{lang === 'tr' ? 'Kaydediliyor...' : 'Saving...'}</span>
+                        ) : showSuccess ? (
+                          <> <CheckCircle2 size={18} /> {lang === 'tr' ? 'Başarıyla Kaydedildi' : 'Successfully Saved'} </>
+                        ) : (
+                          lang === 'tr' ? 'Değişiklikleri Kaydet' : 'Save Changes'
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* SEKME 2: GÖRÜNÜM VE TEMA */}
+                {activeSettingsTab === 'appearance' && (
+                  <div style={{ animation: 'fadeIn 0.3s' }}>
+                    <div style={{ marginBottom: '24px' }}>
+                      <p style={{ fontSize: '0.85em', color: c.textMuted, margin: 0 }}>Görünüm değişiklikleri anında (otomatik) kaydedilir ve tüm cihazlarınızda eşzamanlanır.</p>
+                    </div>
+
+                    <div style={{ marginBottom: '24px' }}>
+                      <label style={{ display: 'block', fontSize: '0.9em', fontWeight: '700', color: c.text, marginBottom: '12px' }}>{lang === 'tr' ? 'Uygulama Teması' : 'Application Theme'}</label>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
+                        {(Object.entries(themes) as any[]).map(([key, val]: any) => (
+                          <div key={key} onClick={() => setTheme(key as any)} style={{ border: theme === key ? `2px solid ${val.accent}` : `1px solid ${isDark ? '#27272a' : '#e2e8f0'}`, borderRadius: '12px', padding: '16px', cursor: 'pointer', background: theme === key ? val.accent + '11' : isDark ? '#18181b' : '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
+                            <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: val.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              {theme === key && <CheckCircle2 size={16} color="#fff" />}
+                            </div>
+                            <span style={{ fontSize: '0.85em', fontWeight: '600', color: c.text }}>{val.name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* AKTİF YAZI BOYUTU (ERİŞİLEBİLİRLİK) SEÇİM ALANI */}
+                    <div style={{ marginBottom: '24px' }}>
+                      <label style={{ display: 'block', fontSize: '0.9em', fontWeight: '700', color: c.text, marginBottom: '12px' }}>
+                        {lang === 'tr' ? 'Metin Yazı Boyutu (Erişilebilirlik)' : 'Text Font Size'}
+                      </label>
+                      <div style={{ display: 'flex', background: isDark ? '#18181b' : '#f1f5f9', padding: '6px', borderRadius: '12px', gap: '6px', maxWidth: '300px' }}>
+                        {(['sm', 'base', 'lg'] as const).map((sz) => (
+                          <button
+                            key={sz}
+                            onClick={() => setFontSize(sz)}
+                            style={{
+                              flex: 1, padding: '10px', borderRadius: '8px', border: 'none', fontWeight: '600', fontSize: '0.85em', cursor: 'pointer',
+                              background: fontSize === sz ? (isDark ? '#27272a' : '#ffffff') : 'transparent',
+                              color: fontSize === sz ? c.text : '#64748b',
+                              boxShadow: fontSize === sz ? '0 2px 10px rgba(0,0,0,0.1)' : 'none',
+                              transition: 'all 0.2s'
+                            }}
+                          >
+                            {sz === 'sm' ? (lang === 'tr' ? 'Küçük' : 'Small') : sz === 'base' ? (lang === 'tr' ? 'Normal' : 'Normal') : (lang === 'tr' ? 'Büyük' : 'Large')}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div style={{ marginBottom: '24px' }}>
+                      <label style={{ display: 'block', fontSize: '0.9em', fontWeight: '700', color: c.text, marginBottom: '12px' }}>{lang === 'tr' ? 'Karanlık / Aydınlık Mod' : 'Dark / Light Mode'}</label>
+                      <div style={{ display: 'flex', background: isDark ? '#18181b' : '#f1f5f9', padding: '6px', borderRadius: '12px', gap: '6px', maxWidth: '300px' }}>
+                        <button onClick={() => setMode('light')} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: mode === 'light' ? '#ffffff' : 'transparent', color: mode === 'light' ? '#0f172a' : '#64748b', fontWeight: '600', fontSize: '0.85em', cursor: 'pointer', boxShadow: mode === 'light' ? '0 2px 10px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}>☀️ Light</button>
+                        <button onClick={() => setMode('dark')} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: mode === 'dark' ? '#27272a' : 'transparent', color: mode === 'dark' ? '#ffffff' : '#64748b', fontWeight: '600', fontSize: '0.85em', cursor: 'pointer', boxShadow: mode === 'dark' ? '0 2px 10px rgba(0,0,0,0.2)' : 'none', transition: 'all 0.2s' }}>🌙 Dark</button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label style={{ display: 'block', fontSize: '0.9em', fontWeight: '700', color: c.text, marginBottom: '12px' }}>{lang === 'tr' ? 'Arayüz Dili' : 'Interface Language'}</label>
+                      <div style={{ display: 'flex', gap: '12px', maxWidth: '300px' }}>
+                        {(Object.entries(langNames) as [Language, string][]).map(([key, name]) => (
+                          <button key={key} onClick={() => setLang(key)} style={{ flex: 1, padding: '10px', borderRadius: '10px', fontWeight: '700', fontSize: '0.85em', cursor: 'pointer', transition: 'all 0.2s', border: lang === key ? `2px solid ${accent}` : `1px solid ${isDark ? '#27272a' : '#e2e8f0'}`, background: lang === key ? accent + '11' : isDark ? '#18181b' : '#f8fafc', color: lang === key ? accent : c.textMuted }}>
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* SEKME 3: PLAN VE FATURALANDIRMA */}
+                {activeSettingsTab === 'billing' && (
+                  <div style={{ animation: 'fadeIn 0.3s' }}>
+                    <div style={{ background: `linear-gradient(135deg, ${accent}15 0%, ${accent}05 100%)`, border: `1px solid ${accent}44`, borderRadius: '16px', padding: '24px', marginBottom: '32px' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', gap: '12px' }}>
+                        <div>
+                          <div style={{ fontSize: '1.5em', fontWeight: '800', color: accent, marginBottom: '4px' }}>Pro Plan</div>
+                          <div style={{ fontSize: '0.9em', color: c.textMuted, fontWeight: '500' }}>Tüm premium yapay zeka analiz özelliklerine erişim.</div>
+                        </div>
+                        <div style={{ background: accent, color: '#fff', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap' }}>AKTİF YÖNETİCİ</div>
+                      </div>
+
+                      <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '0.85em', fontWeight: '600', color: c.text }}>
+                        <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
+                          AI Kullanım Limiti
+                          <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.04em', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '6px', background: isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0', color: c.textMuted }}>Örnek veri</span>
+                        </span>
+                        <span>247 / 500 Token</span>
+                      </div>
+                      <div style={{ height: '8px', background: isDark ? 'rgba(0,0,0,0.3)' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
+                        <div style={{ height: '100%', width: '49.4%', background: accent, borderRadius: '4px' }}></div>
+                      </div>
+                      <div style={{ marginTop: '12px', fontSize: '0.8em', color: c.textMuted }}>Kullanım hakkınız her ayın 1'inde sıfırlanır.</div>
+                    </div>
+
+                    <button style={{ background: isDark ? '#ffffff' : '#0f172a', color: isDark ? '#000000' : '#ffffff', border: 'none', padding: '12px 24px', borderRadius: '10px', fontSize: '0.95em', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s' }}>
+                      Planı Yükselt (Enterprise)
                     </button>
                   </div>
+                )}
+              </div>
 
-                </div>
-              )}
-
-              {/* SEKME 2: GÖRÜNÜM VE TEMA */}
-              {activeSettingsTab === 'appearance' && (
-                <div style={{ animation: 'fadeIn 0.3s' }}>
-                  <div style={{ marginBottom: '32px' }}>
-                    <h3 style={{ fontSize: '20px', fontWeight: '800', color: c.text, marginBottom: '4px' }}>{lang === 'tr' ? 'Görünüm Ayarları' : 'Appearance Settings'}</h3>
-                    <p style={{ fontSize: '13px', color: c.textMuted, margin: 0 }}>Görünüm değişiklikleri anında (otomatik) kaydedilir ve tüm cihazlarınızda eşzamanlanır.</p>
-                  </div>
-
-                  <div style={{ marginBottom: '32px' }}>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '700', color: c.text, marginBottom: '12px' }}>{lang === 'tr' ? 'Uygulama Teması' : 'Application Theme'}</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '16px' }}>
-                      {(Object.entries(themes) as any[]).map(([key, val]: any) => (
-                        <div key={key} onClick={() => setTheme(key as any)} style={{ border: theme === key ? `2px solid ${val.accent}` : `1px solid ${isDark ? '#27272a' : '#e2e8f0'}`, borderRadius: '12px', padding: '16px', cursor: 'pointer', background: theme === key ? val.accent + '11' : isDark ? '#18181b' : '#f8fafc', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px', transition: 'all 0.2s' }}>
-                          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: val.accent, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            {theme === key && <CheckCircle2 size={16} color="#fff" />}
-                          </div>
-                          <span style={{ fontSize: '13px', fontWeight: '600', color: c.text }}>{val.name}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div style={{ marginBottom: '32px' }}>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '700', color: c.text, marginBottom: '12px' }}>{lang === 'tr' ? 'Karanlık / Aydınlık Mod' : 'Dark / Light Mode'}</label>
-                    <div style={{ display: 'flex', background: isDark ? '#18181b' : '#f1f5f9', padding: '6px', borderRadius: '12px', gap: '6px', maxWidth: '300px' }}>
-                      <button onClick={() => setMode('light')} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: mode === 'light' ? '#ffffff' : 'transparent', color: mode === 'light' ? '#0f172a' : '#64748b', fontWeight: '600', fontSize: '13px', cursor: 'pointer', boxShadow: mode === 'light' ? '0 2px 10px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}>☀️ Light</button>
-                      <button onClick={() => setMode('dark')} style={{ flex: 1, padding: '10px', borderRadius: '8px', border: 'none', background: mode === 'dark' ? '#27272a' : 'transparent', color: mode === 'dark' ? '#ffffff' : '#64748b', fontWeight: '600', fontSize: '13px', cursor: 'pointer', boxShadow: mode === 'dark' ? '0 2px 10px rgba(0,0,0,0.2)' : 'none', transition: 'all 0.2s' }}>🌙 Dark</button>
-                    </div>
-                  </div>
-
-                  <div>
-                    <label style={{ display: 'block', fontSize: '14px', fontWeight: '700', color: c.text, marginBottom: '12px' }}>{lang === 'tr' ? 'Arayüz Dili' : 'Interface Language'}</label>
-                    <div style={{ display: 'flex', gap: '12px', maxWidth: '300px' }}>
-                      {(Object.entries(langNames) as [Language, string][]).map(([key, name]) => (
-                        <button key={key} onClick={() => setLang(key)} style={{ flex: 1, padding: '10px', borderRadius: '10px', fontWeight: '700', fontSize: '13px', cursor: 'pointer', transition: 'all 0.2s', border: lang === key ? `2px solid ${accent}` : `1px solid ${isDark ? '#27272a' : '#e2e8f0'}`, background: lang === key ? accent + '11' : isDark ? '#18181b' : '#f8fafc', color: lang === key ? accent : c.textMuted }}>
-                          {name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* SEKME 3: PLAN VE FATURALANDIRMA */}
-              {activeSettingsTab === 'billing' && (
-                <div style={{ animation: 'fadeIn 0.3s' }}>
-                  <h3 style={{ fontSize: '20px', fontWeight: '800', color: c.text, marginBottom: '24px' }}>{lang === 'tr' ? 'Plan ve Kullanım' : 'Plan & Usage'}</h3>
-
-                  <div style={{ background: `linear-gradient(135deg, ${accent}15 0%, ${accent}05 100%)`, border: `1px solid ${accent}44`, borderRadius: '16px', padding: '24px', marginBottom: '32px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px', gap: '12px' }}>
-                      <div>
-                        <div style={{ fontSize: '24px', fontWeight: '800', color: accent, marginBottom: '4px' }}>Pro Plan</div>
-                        <div style={{ fontSize: '14px', color: c.textMuted, fontWeight: '500' }}>Tüm premium yapay zeka analiz özelliklerine erişim.</div>
-                      </div>
-                      <div style={{ background: accent, color: '#fff', padding: '6px 12px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', whiteSpace: 'nowrap' }}>AKTİF YÖNETİCİ</div>
-                    </div>
-
-                    <div style={{ marginBottom: '8px', display: 'flex', justifyContent: 'space-between', fontSize: '13px', fontWeight: '600', color: c.text }}>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '8px' }}>
-                        AI Kullanım Limiti
-                        <span style={{ fontSize: '9px', fontWeight: '700', letterSpacing: '0.04em', textTransform: 'uppercase', padding: '2px 6px', borderRadius: '6px', background: isDark ? 'rgba(255,255,255,0.08)' : '#e2e8f0', color: c.textMuted }}>Örnek veri</span>
-                      </span>
-                      <span>247 / 500 Token</span>
-                    </div>
-                    <div style={{ height: '8px', background: isDark ? 'rgba(0,0,0,0.3)' : '#e2e8f0', borderRadius: '4px', overflow: 'hidden' }}>
-                      <div style={{ height: '100%', width: '49.4%', background: accent, borderRadius: '4px' }}></div>
-                    </div>
-                    <div style={{ marginTop: '12px', fontSize: '12px', color: c.textMuted }}>Kullanım hakkınız her ayın 1'inde sıfırlanır.</div>
-                  </div>
-
-                  <button style={{ background: isDark ? '#ffffff' : '#0f172a', color: isDark ? '#000000' : '#ffffff', border: 'none', padding: '12px 24px', borderRadius: '10px', fontSize: '14px', fontWeight: '700', cursor: 'pointer', transition: 'all 0.2s' }}>
-                    Planı Yükselt (Enterprise)
-                  </button>
-                </div>
-              )}
             </div>
           </div>
         </div>
