@@ -109,6 +109,12 @@ export default function BddPage() {
 
   const s = ui[lang] || ui.tr
 
+  const getStepKeyword = (step: any) =>
+    typeof step?.keyword === 'string' && step.keyword.trim() ? step.keyword : s.and
+
+  const getStepText = (step: any) =>
+    typeof step?.text === 'string' ? step.text : ''
+
   async function handleGenerate() {
     if (!requirement.trim()) return
     setLoading(true)
@@ -129,7 +135,9 @@ export default function BddPage() {
     const featureContent = `Feature: ${result.story?.title || 'Feature'}\n\n` +
       result.scenarios.map((sc: any) =>
         `  Scenario: ${sc.title}\n` +
-        sc.steps.map((step: any) => `    ${step.keyword} ${step.text}`).join('\n')
+        (Array.isArray(sc.steps) ? sc.steps : [])
+          .map((step: any) => `    ${getStepKeyword(step)} ${getStepText(step)}`)
+          .join('\n')
       ).join('\n\n')
 
     const blob = new Blob([featureContent], { type: 'text/plain' })
@@ -146,9 +154,9 @@ export default function BddPage() {
     LOW: '#10b981', DUSUK: '#10b981',
   }
 
-const keywordColor = (kw: string) => {
+const keywordColor = (kw: unknown) => {
     // Görev (b): TR Diakritik düzeltmesi uygulandı (toUpperCase yerine toLocaleUpperCase kullanıldı)
-    const k = kw.toLocaleUpperCase('tr-TR')
+    const k = typeof kw === 'string' ? kw.toLocaleUpperCase('tr-TR') : ''
     if (['GIVEN', 'VERİLDİĞİNDE', 'GEGEBEN'].some(x => k.includes(x))) return '#3b82f6'
     if (['WHEN', 'NE ZAMAN', 'WENN'].some(x => k.includes(x))) return '#8b5cf6'
     if (['THEN', 'O ZAMAN', 'DANN'].some(x => k.includes(x))) return '#10b981'
@@ -315,7 +323,9 @@ const keywordColor = (kw: string) => {
                       <CopyButton
                         getText={() => result.scenarios.map((sc: any) =>
                           `Scenario: ${sc.title}\n` +
-                          sc.steps.map((st: any) => `  ${st.keyword} ${st.text}`).join('\n')
+                          (Array.isArray(sc.steps) ? sc.steps : [])
+                            .map((st: any) => `  ${getStepKeyword(st)} ${getStepText(st)}`)
+                            .join('\n')
                         ).join('\n\n')}
                         label={s.copyBtn}
                         copiedLabel={s.copiedBtn}
@@ -339,12 +349,12 @@ const keywordColor = (kw: string) => {
                           )}
                         </div>
                         <div style={{ padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: '4px', background: colors.bg, fontFamily: 'monospace' }}>
-                          {scenario.steps?.map((step: any, si2: number) => (
+                          {(Array.isArray(scenario.steps) ? scenario.steps : []).map((step: any, si2: number) => (
                             <div key={si2} style={{ display: 'flex', gap: '10px', alignItems: 'flex-start' }}>
-                              <span style={{ fontSize: '11px', fontWeight: '700', color: keywordColor(step.keyword), minWidth: '70px', textAlign: 'right', flexShrink: 0 }}>
-                                {step.keyword}
+                              <span style={{ fontSize: '11px', fontWeight: '700', color: keywordColor(getStepKeyword(step)), minWidth: '70px', textAlign: 'right', flexShrink: 0 }}>
+                                {getStepKeyword(step)}
                               </span>
-                              <span style={{ fontSize: '12px', color: colors.text }}>{step.text}</span>
+                              <span style={{ fontSize: '12px', color: colors.text }}>{getStepText(step)}</span>
                             </div>
                           ))}
                         </div>

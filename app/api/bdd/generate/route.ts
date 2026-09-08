@@ -3,6 +3,38 @@ import { guard } from '@/lib/api-guard'
 import { callGroqJSON, GroqError } from '@/lib/groq'
 import { saveHistoryServer } from '@/lib/history-server'
 
+const BDD_SCHEMA = {
+  type: 'object',
+  properties: {
+    story: { type: 'object' },
+    scenarios: {
+      type: 'array',
+      items: {
+        type: 'object',
+        properties: {
+          title: { type: 'string' },
+          type: { type: 'string' },
+          steps: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                keyword: { type: 'string' },
+                text: { type: 'string' },
+              },
+              required: ['keyword', 'text'],
+              additionalProperties: false,
+            },
+          },
+        },
+        required: ['title', 'steps'],
+      },
+    },
+  },
+  required: ['story', 'scenarios'],
+  additionalProperties: false,
+} as const
+
 export async function POST(req: NextRequest) {
   const gate = await guard('bdd')
   if (gate.error) return gate.error
@@ -61,7 +93,12 @@ Rules:
 - Story points: 1,2,3,5,8,13 (Fibonacci)
 - Return ONLY the JSON, no explanation, no markdown backticks`
 
-    const result = await callGroqJSON({ user: prompt, maxTokens: 2000, temperature: 0.2 })
+    const result = await callGroqJSON({
+      user: prompt,
+      maxTokens: 2000,
+      temperature: 0.2,
+      jsonSchema: BDD_SCHEMA,
+    })
     await saveHistoryServer('BDD Studio', requirement, JSON.stringify(result))
     return NextResponse.json({ result })
   } catch (error) {

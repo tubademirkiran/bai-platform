@@ -5,10 +5,10 @@
  * tek yerde tutulur — böylece model değiştirmek 15 dosya yerine tek satır düzenlemek olur.
  */
 
-const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions'
+const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
 
 /** Kullanılan tek model. Değiştirmek istersen sadece burayı düzenle. */
-export const GROQ_MODEL = 'llama-3.3-70b-versatile'
+export const GEMINI_MODEL = 'gemini-3.5-flash'
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
 
@@ -21,14 +21,16 @@ export interface GroqOptions {
   messages?: ChatMessage[]
   /** JSON modu (response_format: json_object). */
   json?: boolean
+  /** JSON modunda kullanılacak isteğe özel çıktı şeması. */
+  jsonSchema?: Record<string, unknown>
   maxTokens?: number
   temperature?: number
 }
 
 /** Groq API anahtarını doğrular; yoksa anlamlı hata fırlatır. */
 function getApiKey(): string {
-  const key = process.env.GROQ_API_KEY
-  if (!key) throw new GroqError('GROQ_API_KEY tanımlı değil.', 500)
+  const key = process.env.GEMINI_API_KEY
+  if (!key) throw new GroqError('GEMINI_API_KEY tanımlı değil.', 500)
   return key
 }
 
@@ -58,14 +60,22 @@ export async function callGroq(opts: GroqOptions): Promise<string> {
   const apiKey = getApiKey()
 
   const body: Record<string, unknown> = {
-    model: GROQ_MODEL,
+    model: GEMINI_MODEL,
     messages: buildMessages(opts),
     max_tokens: opts.maxTokens ?? 2000,
     temperature: opts.temperature ?? 0.3,
   }
-  if (opts.json) body.response_format = { type: 'json_object' }
+  if (opts.json) {
+    body.response_format = {
+      type: 'json_schema',
+      json_schema: {
+        name: 'response',
+        schema: opts.jsonSchema ?? { type: 'object', additionalProperties: true },
+      },
+    }
+  }
 
-  const response = await fetch(GROQ_URL, {
+  const response = await fetch(GEMINI_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -77,14 +87,29 @@ export async function callGroq(opts: GroqOptions): Promise<string> {
   const data = await response.json().catch(() => null)
 
   if (!response.ok) {
-    const message = data?.error?.message || 'Groq API hatası'
+    const message = data?.error?.message || data?.message || `Gemini API hatası (HTTP ${response.status})`
     // 429/401/400 gibi anlamlı kodları koru; bilinmeyeni 502'ye çevir (upstream).
     const status = response.status >= 400 && response.status < 600 ? response.status : 502
     throw new GroqError(message, status)
   }
 
-  const content = data?.choices?.[0]?.message?.content
-  if (typeof content !== 'string') {
+  const message = data?.choices?.[0]?.message
+  const content =
+    typeof message?.content === 'string'
+      ? message.content
+      : Array.isArray(message?.content)
+        ? message.content
+            .map((part: unknown) =>
+              typeof part === 'object' && part && 'text' in part && typeof part.text === 'string'
+                ? part.text
+                : ''
+            )
+            .join('')
+        : message?.parsed && typeof message.parsed === 'object'
+          ? JSON.stringify(message.parsed)
+          : null
+
+  if (!content) {
     throw new GroqError('Groq beklenen formatta yanıt dönmedi.', 502)
   }
   return content
@@ -156,14 +181,14 @@ export function captureStream(
 export async function streamGroq(opts: GroqOptions): Promise<ReadableStream<Uint8Array>> {
   const apiKey = getApiKey()
 
-  const response = await fetch(GROQ_URL, {
+  const response = await fetch(GEMINI_URL, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model: GEMINI_MODEL,
       messages: buildMessages(opts),
       max_tokens: opts.maxTokens ?? 2000,
       temperature: opts.temperature ?? 0.3,
@@ -174,7 +199,10 @@ export async function streamGroq(opts: GroqOptions): Promise<ReadableStream<Uint
   if (!response.ok || !response.body) {
     const data = await response.json().catch(() => null)
     const status = response.status >= 400 && response.status < 600 ? response.status : 502
-    throw new GroqError(data?.error?.message || 'Groq streaming hatası', status)
+    throw new GroqError(
+      data?.error?.message || data?.message || `Gemini streaming hatası (HTTP ${response.status})`,
+      status
+    )
   }
 
   const upstream = response.body
