@@ -119,7 +119,9 @@ REQUIRED MARKDOWN TEMPLATE (Translate headers and entire content into ${language
       system: systemPrompt,
       user: userPrompt,
       temperature: 0.15,
-      maxTokens: 4000,
+      // 7 bölümlük PRD + 4 User Story ölçülen değeri ~4300 görünür token; pay bırakıldı.
+      // (Düşünme payı lib/groq.ts içinde otomatik ekleniyor.)
+      maxTokens: 6000,
     })
     // Akış bitince tam metni geçmişe kaydet.
     const captured = captureStream(stream, (full) => saveHistoryServer('Requirement', idea, full))

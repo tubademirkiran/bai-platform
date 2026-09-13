@@ -6,12 +6,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
 import { Loader2, Terminal, BookOpen, CheckCircle2, Bot, Download } from 'lucide-react'
+import { postJson } from '@/lib/api-client'
 
 export default function BddPage() {
   const { accent, colors, lang } = useTheme()
   const [requirement, setRequirement] = useState('')
   const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'story' | 'gherkin' | 'both'>('both')
 
   const ui = {
@@ -119,15 +121,14 @@ export default function BddPage() {
     if (!requirement.trim()) return
     setLoading(true)
     setResult(null)
-
-    const response = await fetch('/api/bdd/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requirement, lang }),
-    })
-    const data = await response.json()
-    setResult(data.result)
-    setLoading(false)
+    setError(null)
+    try {
+      setResult(await postJson('/api/bdd/generate', { requirement, lang }))
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Üretim sırasında bir hata oluştu.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   function handleDownload() {
@@ -236,6 +237,7 @@ const keywordColor = (kw: unknown) => {
               <Terminal size={44} style={{ opacity: 0.2 }} />
               <div style={{ fontSize: '14px', color: colors.textMuted }}>{s.emptyTitle}</div>
               <div style={{ fontSize: '12px', color: colors.textMuted, opacity: 0.7, textAlign: 'center' }}>{s.emptyDesc}</div>
+              {error && <div role="alert" style={{ fontSize: '12px', color: '#ef4444', textAlign: 'center' }}>{error}</div>}
             </div>
           )}
 
