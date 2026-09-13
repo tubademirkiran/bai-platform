@@ -8,7 +8,16 @@ export async function POST(req: NextRequest) {
   if (gate.error) return gate.error
 
   try {
-    const { teamSize, duration, backlogSize } = await req.json()
+    const body = await req.json()
+    const {
+      teamSize,
+      duration,
+      backlogSize,
+      seniority = 'mixed',
+      projectType = 'web',
+      externalDependencies = 0,
+      lang = 'tr',
+    } = body
 
     if (!teamSize || !duration || !backlogSize) {
       return NextResponse.json(
@@ -17,24 +26,54 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const prompt = `You are a senior project manager. Analyze the risks of the following project and provide a mitigation plan in Turkish.
+    // Türetilmiş metrik hesaplama
+    const totalPersonWeeks = Number(teamSize) * Number(duration)
+    const tasksPerPersonPerWeek =
+      totalPersonWeeks > 0 ? (Number(backlogSize) / totalPersonWeeks).toFixed(1) : '0'
 
-Project details:
-- Team size: ${teamSize} people
-- Project duration: ${duration} weeks
-- Backlog size: ${backlogSize} tasks
+    const langNames: Record<string, string> = {
+      tr: 'Turkish',
+      en: 'English',
+      de: 'German',
+    }
+    const outputLanguage = langNames[lang] || 'Turkish'
 
-Provide:
-1. RISK SCORE (Low/Medium/High)
-2. TOP 5 RISKS with probability and impact
-3. MITIGATION STRATEGIES for each risk
-4. OVERALL RECOMMENDATION`
+    const prompt = `You are an elite Agile PMO Director and Senior Project Risk Officer.
+Analyze the following software project metrics and generate a detailed, actionable Risk Assessment Report in ${outputLanguage}.
 
-    const stream = await streamGroq({ user: prompt, maxTokens: 1000 })
+### INPUT METRICS & CONTEXT
+- Team Size: ${teamSize} people
+- Project Duration: ${duration} weeks (${totalPersonWeeks} total person-weeks)
+- Backlog Size: ${backlogSize} tasks
+- Derived Workload Index: ~${tasksPerPersonPerWeek} tasks per person/week
+- Team Seniority Profile: ${seniority}
+- Project Domain/Category: ${projectType}
+- External API / Supplier Dependencies: ${externalDependencies}
+
+### REQUIRED REPORT STRUCTURE (Use Markdown)
+
+# 📊 EXECUTIVE SUMMARY & RISK SCORE
+- **Overall Risk Level:** [🔴 High / 🟡 Medium / 🟢 Low] (Risk Score: X/10)
+- **Velocity Assessment:** Evaluate if ~${tasksPerPersonPerWeek} tasks/person/week is realistic considering the ${seniority} team structure and ${projectType} scope.
+
+# ⚡ KEY RISK MATRIX (Categorized)
+Provide detailed risk analysis under 4 headers:
+1. 👥 **Human Resources & Experience Risk** (Seniority impact)
+2. ⏱️ **Schedule & Velocity Risk** (Deadlines vs Scope)
+3. ⚙️ **Technical & Domain Risk** (${projectType} complexity)
+4. 🔗 **External Dependency Risk** (${externalDependencies} integration bottlenecks)
+
+# 🛡️ MITIGATION & ACTION ROADMAP
+- Actionable step-by-step solutions to reduce identified risks.
+
+# 💡 PMO STRATEGIC RECOMMENDATIONS
+- 3 high-leverage strategic suggestions for delivery success.`
+
+    const stream = await streamGroq({ user: prompt, maxTokens: 1500 })
     const captured = captureStream(stream, (full) =>
       saveHistoryServer(
         'Risk Analyzer',
-        `Ekip: ${teamSize} kişi | Süre: ${duration} hafta | Backlog: ${backlogSize} görev`,
+        `Ekip: ${teamSize} | Süre: ${duration}h | Backlog: ${backlogSize} | Kıdem: ${seniority}`,
         full
       )
     )
