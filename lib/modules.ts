@@ -122,6 +122,7 @@ export const MODULES: ModuleDef[] = [
       en: 'Build architecture and scope in BMAD standards',
       de: 'Erstelle Architektur und Umfang nach BMAD-Standards',
     },
+    historyLabels: ['Atlas Studio'],
   },
   {
     id: 'risk', href: '/dashboard/risk', category: 'analiz', icon: AlertTriangle, badge: 'PM',

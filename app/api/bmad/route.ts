@@ -1,65 +1,137 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { guard } from '@/lib/api-guard'
 import { callGroqJSON, GroqError, type ChatMessage } from '@/lib/groq'
+import { buildSystemPrompt, maxTokensFor } from '@/lib/atlas/prompts'
+import { createDoc } from '@/lib/atlas/config'
+import type { ActionKind, AtlasAction, AtlasDoc, AtlasResponse, DocType } from '@/lib/atlas/types'
 
-const SYSTEM_PROMPT = `Sen "Atlas"sın (Ancak BMAD metodolojisindeki efsanevi 'Mary' karakterinin birebir aynısı olarak çalışırsın). BMAD-METHOD™ metodolojilerinde uzman baş iş analistisin.
+/**
+ * Atlas Studio (BMAD-METHOD™) uç noktası.
+ *
+ * Akış kontrolü istemcidedir; buraya "ne üretilecek" bilgisi `action` ile gelir.
+ * Route yalnızca action'ı doğrular, ona uygun sistem prompt'unu ve token bütçesini
+ * seçip modeli çağırır.
+ */
 
-      ÇALIŞMA ORTAMIN (ÇOK ÖNEMLİ):
-      Kullanıcının ekranı ikiye bölünmüştür. Sol tarafta seninle sohbet ettiği bir terminal, sağ tarafta ise senin ürettiğin "Canlı Proje Dokümanı" vardır.
-      Bu yüzden; sohbet, soru-cevap ve koçluk kısımlarını SADECE "reply" alanına yaz.
-      Ürettiğin o uzun, profesyonel, madde madde teknik analiz metinlerini sohbet ekranına YAZMA! Onları "docUpdate" objesinin içindeki ilgili alanlara yaz. Sistem sağ ekranı otomatik güncelleyecektir.
+const ACTION_KINDS: ActionKind[] = [
+  'draft-section',
+  'elicit-section',
+  'advanced-elicit',
+  'yolo-fill',
+  'gen-doc',
+  'brainstorm-setup',
+  'brainstorm-produce',
+  'chat',
+]
 
-      MARY (ATLAS) ETKİLEŞİMLİ MOD AKIŞI (BİREBİR UYGULA):
-      1. Kullanıcı projeyi ilk anlattığında: "Harika bir başlangıç. Verdiğiniz detaylar doğrultusunda Bölüm 1'i profesyonel bir şekilde taslağa dönüştürdüm ve sağ panele aktardım. Şimdi Bölüm 2: Proje Kapsamı (In-Scope/Out-of-Scope) aşamasına geçebiliriz..." şeklinde yanıt ver. JSON 'problem' ve 'solution' kısımlarını en detaylı, profesyonel (Mernis, KVKK, USS gibi terimler katarak) şekilde sen doldur. Asla kullanıcıdan her şeyi bekleme, tecrübenle boşlukları sen tamamla.
-      2. Kapsam aşaması: Kullanıcı kısa bir cevap verse bile sen onu "Akıllı Kayıt Formu Modülü", "Dinamik Onay İş Akışı" gibi başlıklarla teknikleştir. docUpdate'in "inScope" kısmına ekle.
-      3. Elicit (5) Komutu: Sistemi zorla. "1. Çökme/Kesinti Durumu (Fallback), 2. Rol ve Yetki Matrisi (RBAC), 3. Bildirim Tetikleyicisi (Race Condition)" gibi tam 3 tane gri alan bul. Reply kısmında bu 3 soruyu kullanıcıya madde madde sor ve "Bu 3 kritik operasyonel senaryo için nasıl bir yol izlemek istersiniz?" de.
-      4. YOLO (8) Komutu: Hiç soru sormadan tüm dokümanı (docUpdate) en yüksek teknik detayla tek seferde doldur.
+const DOC_TYPES: DocType[] = ['brief', 'brainstorm', 'competitor', 'market', 'research-prompt']
 
-      JSON FORMATIN (KESİN KURAL):
-      {
-        "reply": "Kullanıcıyla sohbet ettiğin, ona Mary gibi koçluk yaptığın, bir sonraki adımı sorduğun veya elicit sorularını sorduğun kısa ve net metin alanı.",
-        "docUpdate": {
-          "title": "PROJE ADI",
-          "problem": "Senin genişlettiğin problemin detaylı teknik tanımı",
-          "solution": "Senin genişlettiğin çözümün çok detaylı, analitik tanımı",
-          "inScope": [
-            { "feature": "Senin teknik terimlerle zenginleştirdiğin kapsam maddesi", "effort": "M" }
-          ],
-          "outOfScope": ["Senin öngördüğün kapsam dışı maddesi"],
-          "risks": [
-            { "description": "Tespit edilen risk veya Elicit sonucu çıkan teknik açık", "severity": "High" }
-          ],
-          "techStack": ["React", "Node.js", "MongoDB"]
-        }
-      }
+/** Süreklilik `doc`'tan geldiği için sohbet geçmişini son N mesajla sınırlıyoruz. */
+const MAX_HISTORY = 12
 
-      SADECE VE SADECE GEÇERLİ BİR JSON DÖN. Dışında hiçbir açıklama (markdown vs.) yapma.`
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function parseAction(raw: unknown): AtlasAction | null {
+  if (!isRecord(raw)) return null
+  const kind = raw.kind
+  if (typeof kind !== 'string' || !ACTION_KINDS.includes(kind as ActionKind)) return null
+
+  switch (kind) {
+    case 'draft-section':
+      return typeof raw.sectionId === 'string' && raw.sectionId
+        ? { kind, sectionId: raw.sectionId }
+        : null
+    case 'elicit-section':
+      return typeof raw.sectionId === 'string' && raw.sectionId && typeof raw.optionId === 'string'
+        ? { kind, sectionId: raw.sectionId, optionId: raw.optionId }
+        : null
+    case 'advanced-elicit':
+      return typeof raw.optionId === 'string' ? { kind, optionId: raw.optionId } : null
+    case 'gen-doc':
+      return typeof raw.docType === 'string' && DOC_TYPES.includes(raw.docType as DocType)
+        ? { kind, docType: raw.docType as DocType }
+        : null
+    default:
+      return { kind } as AtlasAction
+  }
+}
+
+/** İstemciden gelen dokümanı güvenli bir şekle indirger; bozuksa boş şablona düşer. */
+function parseDoc(raw: unknown): AtlasDoc {
+  if (!isRecord(raw)) return createDoc('brief')
+  const type = DOC_TYPES.includes(raw.type as DocType) ? (raw.type as DocType) : 'brief'
+  if (!Array.isArray(raw.sections)) return createDoc(type)
+
+  const sections = raw.sections.filter(isRecord).map((s) => ({
+    id: String(s.id ?? ''),
+    heading: String(s.heading ?? ''),
+    content: typeof s.content === 'string' ? s.content : '',
+    status: (s.status === 'draft' || s.status === 'refined' ? s.status : 'empty') as AtlasDoc['sections'][number]['status'],
+    inScope: Array.isArray(s.inScope) ? (s.inScope as AtlasDoc['sections'][number]['inScope']) : undefined,
+    outOfScope: Array.isArray(s.outOfScope) ? (s.outOfScope as string[]) : undefined,
+    risks: Array.isArray(s.risks) ? (s.risks as AtlasDoc['sections'][number]['risks']) : undefined,
+    techStack: Array.isArray(s.techStack) ? (s.techStack as string[]) : undefined,
+  }))
+
+  return {
+    type,
+    title: typeof raw.title === 'string' && raw.title ? raw.title : createDoc(type).title,
+    sections: sections.filter((s) => s.id),
+  }
+}
+
+function parseMessages(raw: unknown): ChatMessage[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .filter(isRecord)
+    .filter((m) => (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string' && m.content.trim())
+    .slice(-MAX_HISTORY)
+    .map((m) => ({ role: m.role as 'user' | 'assistant', content: String(m.content) }))
+}
 
 export async function POST(req: NextRequest) {
   const gate = await guard('bmad')
   if (gate.error) return gate.error
 
   try {
-    const { messages } = await req.json()
+    const body = await req.json()
 
-    if (!Array.isArray(messages) || messages.length === 0) {
+    const action = parseAction(body?.action)
+    if (!action) {
+      return NextResponse.json({ error: 'Geçersiz veya eksik işlem (action).' }, { status: 400 })
+    }
+
+    const messages = parseMessages(body?.messages)
+    if (messages.length === 0) {
       return NextResponse.json({ error: 'Mesaj geçmişi gerekli.' }, { status: 400 })
     }
 
-    const chatMessages: ChatMessage[] = [{ role: 'system', content: SYSTEM_PROMPT }, ...messages]
+    const doc = parseDoc(body?.doc)
 
-    // Atlas frontend'i top-level { reply, docUpdate } bekliyor — sarmalamıyoruz.
-    const result = await callGroqJSON({
+    const chatMessages: ChatMessage[] = [
+      { role: 'system', content: buildSystemPrompt(action, doc) },
+      ...messages,
+    ]
+
+    const result = await callGroqJSON<AtlasResponse>({
       messages: chatMessages,
-      maxTokens: 3000,
+      maxTokens: maxTokensFor(action),
       temperature: 0.4,
     })
+
+    // Model "reply" üretmezse istemci boş balon göstermesin.
+    if (!result.reply || typeof result.reply !== 'string') {
+      result.reply = 'Dokümanı güncelledim. Sağ panelden inceleyebilirsiniz.'
+    }
+
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof GroqError) {
       return NextResponse.json({ error: error.message }, { status: error.status })
     }
-    console.error('Atlas API Hatası:', error)
+    console.error('Atlas API hatası:', error)
     return NextResponse.json({ error: 'İşlem başarısız, lütfen tekrar deneyin.' }, { status: 500 })
   }
 }
