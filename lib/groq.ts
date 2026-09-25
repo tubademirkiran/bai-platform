@@ -1,17 +1,42 @@
 const GEMINI_URL = 'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions'
 
 /**
- * Kullanılan tek model. Değiştirmek istersen sadece burayı (veya GEMINI_MODEL
- * ortam değişkenini) düzenle.
+ * Birincil model. GEMINI_MODEL ortam değişkeni ile geçersiz kılınabilir.
  *
- * DİKKAT — model isimleri hızla emekliye ayrılıyor:
+ * DİKKAT — model isimleri hızla emekliye ayrılıyor VE tek tek aşırı yüklenebiliyor:
  *  - gemini-1.5-flash / gemini-2.0-flash : tamamen kaldırıldı, 404 döner.
  *  - gemini-2.5-flash : ListModels listesinde görünür ama yeni anahtarlara
- *    kapalı, yine 404 döner. Listede olması kullanılabilir olduğu anlamına gelmiyor.
- *  - gemini-3.5-flash / gemini-3.6-flash : doğrulandı, çalışıyor.
+ *    kapalı, 404 döner. Listede olması kullanılabilir olduğu anlamına gelmiyor.
+ *  - gemini-3.5 / 3.7 / 3.8-flash : 2026-09-25 ölçümünde KALICI 503
+ *    ("experiencing high demand") — her denemede başarısız.
+ *  - gemini-3.6-flash / gemini-flash-latest / gemini-3-flash-preview : doğrulandı.
  * Model değiştirmeden önce gerçek bir chat/completions isteğiyle test et.
  */
-export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash'
+export const GEMINI_MODEL = process.env.GEMINI_MODEL || 'gemini-3.6-flash'
+
+/**
+ * Birincil model 503/429 verirse sırayla denenecek yedekler.
+ *
+ * NEDEN: 2026-09-25'te gemini-3.5-flash saatlerce 503 döndü ve tek model'e bağlı
+ * olan 16 aracın TAMAMI yanıtsız kaldı. Tek bir modelin aşırı yüklenmesi artık
+ * platformu durdurmasın. GEMINI_FALLBACK_MODELS ile (virgüllü) değiştirilebilir.
+ */
+const FALLBACK_MODELS = (process.env.GEMINI_FALLBACK_MODELS ?? 'gemini-flash-latest,gemini-3-flash-preview')
+  .split(',')
+  .map((m) => m.trim())
+  .filter(Boolean)
+
+/** Denenecek model sırası; tekrarlar ayıklanır. */
+const MODEL_CHAIN = [...new Set([GEMINI_MODEL, ...FALLBACK_MODELS])]
+
+/** Geçici hatalar — aynı modelde tekrar denemeye değer. */
+const RETRYABLE_STATUS = new Set([408, 429, 500, 502, 503, 504])
+/** Model başına deneme sayısı (ilk istek dahil). */
+const ATTEMPTS_PER_MODEL = 2
+/** Denemeler arası bekleme; 503 genelde ~1sn içinde döndüğü için kısa tutuldu. */
+const RETRY_BACKOFF_MS = [400, 1200]
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms))
 
 export type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string }
 
@@ -84,6 +109,72 @@ function extractErrorMessage(data: unknown, status: number): string {
   return `Gemini API hatası (HTTP ${status})`
 }
 
+/**
+ * İsteği model zinciri boyunca dener ve BAŞARILI Response'u döndürür.
+ *
+ * Sıra: her model için en fazla ATTEMPTS_PER_MODEL deneme (geçici hatalarda
+ * backoff'lu), sonra zincirdeki bir sonraki modele geç.
+ *  - 400/401/403  -> kalıcı istek/anahtar hatası, hemen fırlat (yedek denemeye gerek yok)
+ *  - 404          -> model bu anahtara kapalı, tekrar deneme; doğrudan sonraki modele geç
+ *  - 429/5xx      -> geçici, aynı modelde tekrar dene; tükenirse sonraki modele geç
+ *
+ * @param buildBody Model adını alıp istek gövdesini üreten fonksiyon.
+ */
+async function fetchWithFallback(
+  buildBody: (model: string) => Record<string, unknown>
+): Promise<Response> {
+  const apiKey = getApiKey()
+  let lastError: GroqError | null = null
+
+  for (const model of MODEL_CHAIN) {
+    for (let attempt = 0; attempt < ATTEMPTS_PER_MODEL; attempt++) {
+      let response: Response
+      try {
+        response = await fetch(GEMINI_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+          body: JSON.stringify(buildBody(model)),
+          signal: AbortSignal.timeout(60_000),
+        })
+      } catch (error) {
+        // Ağ/timeout — geçici say, tekrar dene.
+        lastError = new GroqError(
+          error instanceof Error && error.name === 'TimeoutError'
+            ? 'Yapay zeka servisi zaman aşımına uğradı. Lütfen tekrar deneyin.'
+            : 'Yapay zeka servisine ulaşılamadı. Lütfen bağlantıyı ve API anahtarını kontrol edin.',
+          502
+        )
+        if (attempt < ATTEMPTS_PER_MODEL - 1) await sleep(RETRY_BACKOFF_MS[attempt])
+        continue
+      }
+
+      if (response.ok) {
+        if (model !== GEMINI_MODEL) {
+          console.warn(`[gemini] Birincil model "${GEMINI_MODEL}" kullanılamadı; "${model}" ile yanıt alındı.`)
+        }
+        return response
+      }
+
+      // Hata gövdesini oku (akış modunda da JSON döner).
+      const data = await response.json().catch(() => null)
+      const status = response.status >= 400 && response.status < 600 ? response.status : 502
+      lastError = new GroqError(extractErrorMessage(data, response.status), status)
+
+      if (status === 400 || status === 401 || status === 403) throw lastError
+      if (status === 404) break // model kapalı — beklemeden sonraki modele geç
+      if (!RETRYABLE_STATUS.has(status)) break
+
+      console.warn(`[gemini] ${model} HTTP ${status} (deneme ${attempt + 1}/${ATTEMPTS_PER_MODEL})`)
+      if (attempt < ATTEMPTS_PER_MODEL - 1) await sleep(RETRY_BACKOFF_MS[attempt])
+    }
+  }
+
+  throw (
+    lastError ??
+    new GroqError('Yapay zeka servisine ulaşılamadı. Lütfen tekrar deneyin.', 502)
+  )
+}
+
 function buildMessages(opts: GroqOptions): ChatMessage[] {
   if (opts.messages && opts.messages.length) return opts.messages
   const msgs: ChatMessage[] = []
@@ -93,55 +184,26 @@ function buildMessages(opts: GroqOptions): ChatMessage[] {
 }
 
 export async function callGroq(opts: GroqOptions): Promise<string> {
-  const apiKey = getApiKey()
-
-  const body: Record<string, unknown> = {
-    model: GEMINI_MODEL,
-    messages: buildMessages(opts),
-    max_tokens: resolveMaxTokens(opts.maxTokens),
-    temperature: opts.temperature ?? 0.1, // Düşük sıcaklık JSON tutarlılığını artırır
-  }
-  if (opts.reasoningEffort) body.reasoning_effort = opts.reasoningEffort
-
-  // Gemini OpenAI entegrasyonu için doğru response_format yapılandırması
-  if (opts.json) {
-    if (opts.jsonSchema) {
-      body.response_format = {
-        type: 'json_schema',
-        json_schema: {
-          name: 'response',
-          schema: opts.jsonSchema,
-        },
-      }
-    } else {
-      body.response_format = { type: 'json_object' }
+  const buildBody = (model: string): Record<string, unknown> => {
+    const body: Record<string, unknown> = {
+      model,
+      messages: buildMessages(opts),
+      max_tokens: resolveMaxTokens(opts.maxTokens),
+      temperature: opts.temperature ?? 0.1, // Düşük sıcaklık JSON tutarlılığını artırır
     }
+    if (opts.reasoningEffort) body.reasoning_effort = opts.reasoningEffort
+
+    // Gemini OpenAI entegrasyonu için doğru response_format yapılandırması
+    if (opts.json) {
+      body.response_format = opts.jsonSchema
+        ? { type: 'json_schema', json_schema: { name: 'response', schema: opts.jsonSchema } }
+        : { type: 'json_object' }
+    }
+    return body
   }
 
-  let response: Response
-  try {
-    response = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(60_000),
-    })
-  } catch (error) {
-    const message = error instanceof Error && error.name === 'TimeoutError'
-      ? 'Yapay zeka servisi zaman aşımına uğradı. Lütfen tekrar deneyin.'
-      : 'Yapay zeka servisine ulaşılamadı. Lütfen bağlantıyı ve API anahtarını kontrol edin.'
-    throw new GroqError(message, 502)
-  }
-
+  const response = await fetchWithFallback(buildBody)
   const data = await response.json().catch(() => null)
-
-  if (!response.ok) {
-    const status = response.status >= 400 && response.status < 600 ? response.status : 502
-    throw new GroqError(extractErrorMessage(data, response.status), status)
-  }
 
   const choice = data?.choices?.[0]
   const message = choice?.message
@@ -243,38 +305,19 @@ export function captureStream(
 }
 
 export async function streamGroq(opts: GroqOptions): Promise<ReadableStream<Uint8Array>> {
-  const apiKey = getApiKey()
+  // Yeniden deneme/yedek model seçimi akış BAŞLAMADAN önce biter; istemciye
+  // yalnızca çalışan bir modelin gövdesi aktarılır.
+  const response = await fetchWithFallback((model) => ({
+    model,
+    messages: buildMessages(opts),
+    max_tokens: resolveMaxTokens(opts.maxTokens),
+    temperature: opts.temperature ?? 0.1,
+    ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
+    stream: true,
+  }))
 
-  let response: Response
-  try {
-    response = await fetch(GEMINI_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: GEMINI_MODEL,
-        messages: buildMessages(opts),
-        max_tokens: resolveMaxTokens(opts.maxTokens),
-        temperature: opts.temperature ?? 0.1,
-        ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
-        stream: true,
-      }),
-      signal: AbortSignal.timeout(60_000),
-    })
-  } catch (error) {
-    const message = error instanceof Error && error.name === 'TimeoutError'
-      ? 'Yapay zeka servisi zaman aşımına uğradı. Lütfen tekrar deneyin.'
-      : 'Yapay zeka servisine ulaşılamadı. Lütfen bağlantıyı ve API anahtarını kontrol edin.'
-    throw new GroqError(message, 502)
-  }
-
-  if (!response.ok || !response.body) {
-    // Hata gövdesi burada da dizi olarak gelir; extractErrorMessage her iki şekli de çözer.
-    const data = await response.json().catch(() => null)
-    const status = response.status >= 400 && response.status < 600 ? response.status : 502
-    throw new GroqError(extractErrorMessage(data, response.status), status)
+  if (!response.body) {
+    throw new GroqError('Yapay zeka servisi boş bir akış döndürdü. Lütfen tekrar deneyin.', 502)
   }
 
   const upstream = response.body

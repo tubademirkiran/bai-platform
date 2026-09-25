@@ -6,11 +6,14 @@ import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/ui/empty-state'
 import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
+import { ErrorBanner } from '@/components/ui/error-banner'
+import { postJson } from '@/lib/api-client'
 import { Loader2, Ticket, Bug, Zap, Tag, User, CheckCircle2, Settings, Ban, Rocket } from 'lucide-react'
 
 export default function JiraGeneratorPage() {
   const { accent, colors, lang, isDark } = useTheme()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<any>(null)
 
   // Form State
@@ -25,19 +28,14 @@ export default function JiraGeneratorPage() {
   async function handleGenerate() {
     if (!form.requirement.trim()) return
     setLoading(true)
+    setError(null)
     setResult(null)
 
     try {
-      const response = await fetch('/api/jira/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, lang }),
-      })
-      const data = await response.json()
-      setResult(data.result)
       // Geçmişe kayıt server tarafında (API) yapılıyor.
-    } catch (error) {
-      console.error(error)
+      setResult(await postJson('/api/jira/generate', { ...form, lang }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Jira bileti oluşturulamadı. Lütfen tekrar deneyin.')
     } finally {
       setLoading(false)
     }
@@ -68,6 +66,8 @@ export default function JiraGeneratorPage() {
         description={lang === 'tr' ? 'Ham talepleri Developer-Ready (Geliştirmeye Hazır) teknik Jira biletlerine dönüştürün.' : 'Convert raw requests into Developer-Ready technical Jira tickets.'}
         icon={Ticket}
       />
+
+      {error && <ErrorBanner message={error} onRetry={handleGenerate} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: '16px', alignItems: 'start', flex: 1 }}>
         

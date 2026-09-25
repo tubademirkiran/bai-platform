@@ -6,6 +6,8 @@ import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
+import { ErrorBanner } from '@/components/ui/error-banner'
+import { postJson } from '@/lib/api-client'
 import { GitMerge, Loader2, Download } from 'lucide-react'
 
 function FlowchartPageInner() {
@@ -15,6 +17,7 @@ function FlowchartPageInner() {
   const [requirement, setRequirement] = useState('')
   const [mermaidCode, setMermaidCode] = useState('')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [diagramType, setDiagramType] = useState<'flowchart' | 'sequence' | 'erDiagram'>('flowchart')
   const [rendered, setRendered] = useState(false)
 
@@ -39,7 +42,7 @@ function FlowchartPageInner() {
         theme: 'neutral',
         flowchart: { curve: 'basis' },
       })
-      const id = 'diagram-' + Date.now()
+      const id = 'diagram-' + Math.random().toString(36).slice(2)
       const { svg } = await mermaid.render(id, mermaidCode)
       const container = document.getElementById('diagram-container')
       if (container) {
@@ -47,28 +50,38 @@ function FlowchartPageInner() {
         setRendered(true)
       }
     } catch (e) {
+      // Mermaid geçersiz sözdizimi ürettiyse önizleme boş kalır; kullanıcıya
+      // sessiz boş kutu yerine ne olduğunu söyle — ham kod zaten solda görünüyor.
       console.error('Mermaid render error:', e)
+      setRendered(false)
+      setError(
+        'Yapay zeka geçerli bir diyagram sözdizimi üretemedi, önizleme çizilemedi. Ham Mermaid kodunu aşağıdan kopyalayabilir veya tekrar deneyebilirsiniz.'
+      )
     }
   }
 
   async function handleGenerate(autoPrompt?: string) {
     const textToProcess = autoPrompt || requirement
     if (!textToProcess.trim()) return
-    
+
     setLoading(true)
+    setError(null)
     setMermaidCode('')
     setRendered(false)
     const container = document.getElementById('diagram-container')
     if (container) container.innerHTML = ''
 
-    const response = await fetch('/api/flowchart/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requirement: textToProcess, diagramType }),
-    })
-    const data = await response.json()
-    setMermaidCode(data.result)
-    setLoading(false)
+    try {
+      const result = await postJson<string>('/api/flowchart/generate', {
+        requirement: textToProcess,
+        diagramType,
+      })
+      setMermaidCode(result)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Diyagram oluşturulamadı. Lütfen tekrar deneyin.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   function handleDownload() {
@@ -105,8 +118,10 @@ function FlowchartPageInner() {
       <PageHeader 
         title="Flowchart Generator" 
         description="Gereksinim metnini yaz, AI otomatik akış şeması çizsin." 
-        icon={GitMerge} 
+        icon={GitMerge}
       />
+
+      {error && <ErrorBanner message={error} onRetry={() => handleGenerate()} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px' }}>
 

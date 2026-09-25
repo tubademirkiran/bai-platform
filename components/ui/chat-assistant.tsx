@@ -31,6 +31,18 @@ export default function ChatAssistant() {
     setMessages(prev => [...prev, { role: 'user', content: userMsg }])
     setLoading(true)
 
+    // Akış başladıysa hata balonunu YENİ mesaj olarak değil, o balonun yerine yaz;
+    // aksi halde ekranda boş bir asistan balonu + hata balonu yan yana kalıyordu.
+    let bubbleOpened = false
+
+    const failWith = (text: string) =>
+      setMessages(prev => {
+        if (!bubbleOpened) return [...prev, { role: 'assistant' as const, content: text }]
+        const next = [...prev]
+        next[next.length - 1] = { role: 'assistant', content: text }
+        return next
+      })
+
     try {
       const response = await fetch('/api/chat', {
         method: 'POST',
@@ -40,11 +52,17 @@ export default function ChatAssistant() {
 
       if (!response.ok || !response.body) {
         const data = await response.json().catch(() => null)
-        throw new Error(data?.error || 'İstek başarısız')
+        const reason =
+          response.status === 401 ? 'Oturumunuz sona ermiş. Lütfen tekrar giriş yapın.'
+            : response.status === 429 ? 'Çok fazla istek gönderildi. Lütfen bir dakika bekleyin.'
+              : data?.error || `İstek başarısız oldu (HTTP ${response.status}).`
+        throw new Error(reason)
       }
 
       // Boş bir asistan balonu ekle ve akışı içine yaz.
       setMessages(prev => [...prev, { role: 'assistant', content: '' }])
+      bubbleOpened = true
+
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let acc = ''
@@ -58,8 +76,13 @@ export default function ChatAssistant() {
           return next
         })
       }
-    } catch {
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Bir hata olustu, tekrar deneyin.' }])
+
+      // Tek token gelmediyse kalıcı boş balon bırakma.
+      if (!acc.trim()) {
+        failWith('Yapay zeka boş yanıt döndürdü. Lütfen tekrar deneyin.')
+      }
+    } catch (e) {
+      failWith(e instanceof Error ? e.message : 'Bir hata oluştu, lütfen tekrar deneyin.')
     }
     setLoading(false)
   }

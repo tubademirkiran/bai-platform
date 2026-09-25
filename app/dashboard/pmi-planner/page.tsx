@@ -5,6 +5,8 @@ import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
+import { ErrorBanner } from '@/components/ui/error-banner'
+import { postJson } from '@/lib/api-client'
 import { Target, Clock, Users, AlertTriangle, Building2, Check, type LucideIcon, Briefcase } from 'lucide-react'
 
 type Methodology = 'waterfall' | 'agile' | 'hybrid'
@@ -13,6 +15,7 @@ type Tab = 'scope' | 'schedule' | 'stakeholders' | 'risks'
 export default function PMIPlannerPage() {
   const { accent, colors, lang, isDark } = useTheme()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<Tab>('scope')
 
@@ -28,18 +31,13 @@ export default function PMIPlannerPage() {
   async function handleGenerate() {
     if (!form.projectName || !form.summary) return
     setLoading(true)
+    setError(null)
     setResult(null)
 
     try {
-      const response = await fetch('/api/pmi/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, lang }),
-      })
-      const data = await response.json()
-      setResult(data.result)
-    } catch (error) {
-      console.error(error)
+      setResult(await postJson('/api/pmi/generate', { ...form, lang }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Proje planı oluşturulamadı. Lütfen tekrar deneyin.')
     } finally {
       setLoading(false)
     }
@@ -106,6 +104,8 @@ export default function PMIPlannerPage() {
         description={lang === 'tr' ? 'Uluslararası standartlarda (PMI) proje başlatma belgesi ve master plan üretin.' : 'Generate project charter and master plan based on PMI standards.'}
         icon={Briefcase}
       />
+
+      {error && <ErrorBanner message={error} onRetry={handleGenerate} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: '16px', alignItems: 'start' }}>
         

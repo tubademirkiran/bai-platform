@@ -6,6 +6,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { getHistory } from '@/lib/history'
 import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
+import { ErrorBanner } from '@/components/ui/error-banner'
+import { postJson } from '@/lib/api-client'
 import {
   Loader2, FlaskConical, Search, FolderTree, Database, CheckCircle2,
   AlertTriangle, AlertOctagon, AlertCircle, type LucideIcon, Activity
@@ -18,6 +20,7 @@ export default function ImpactPage() {
   const [context, setContext] = useState('')
   const [result, setResult] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [loadingHistory, setLoadingHistory] = useState(false)
 
   const ui = {
@@ -121,27 +124,32 @@ export default function ImpactPage() {
 
   async function loadFromHistory() {
     setLoadingHistory(true)
-    const history = await getHistory()
-    const combined = history
-      .slice(0, 10)
-      .map((h: any) => `[${h.module.toUpperCase()}] ${h.input}: ${h.output?.slice(0, 200)}`)
-      .join('\n\n')
-    setContext(combined)
-    setLoadingHistory(false)
+    try {
+      const history = await getHistory()
+      const combined = history
+        .slice(0, 10)
+        .map((h: any) => `[${h.module.toUpperCase()}] ${h.input}: ${h.output?.slice(0, 200)}`)
+        .join('\n\n')
+      setContext(combined)
+    } catch (e) {
+      setError('Geçmiş yüklenemedi. Sistem kontekstini elle yazabilirsiniz.')
+    } finally {
+      setLoadingHistory(false)
+    }
   }
 
   async function handleAnalyze() {
     if (!currentRule.trim() || !newRule.trim()) return
     setLoading(true)
+    setError(null)
     setResult(null)
-    const response = await fetch('/api/impact/analyze', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ currentRule, newRule, context, lang }),
-    })
-    const data = await response.json()
-    setResult(data.result)
-    setLoading(false)
+    try {
+      setResult(await postJson('/api/impact/analyze', { currentRule, newRule, context, lang }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Etki analizi yapılamadı. Lütfen tekrar deneyin.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const inputStyle = {
@@ -178,6 +186,8 @@ export default function ImpactPage() {
     <div>
       {/* Görev (a): PageHeader prop'u desc'ten description'a güncellendi ve Activity ikonu eklendi */}
       <PageHeader title={s.title} description={s.desc} icon={Activity} />
+
+      {error && <ErrorBanner message={error} onRetry={handleAnalyze} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.4fr', gap: '16px' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>

@@ -5,6 +5,7 @@ import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
+import { postJsonFields } from '@/lib/api-client'
 import { Database, Save, FileText, Bookmark, Trash2, X } from 'lucide-react'
 
 export default function SqlPage() {
@@ -119,22 +120,17 @@ export default function SqlPage() {
     setError(null)
 
     try {
-      const response = await fetch('/api/sql/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query, lang }),
-      })
-      const data = await response.json()
-
-      if (response.ok) {
-        setSql(data.sql)
-        setExplanation(data.explanation)
-      } else {
-        setError(data.error || s.errorGeneric)
-      }
+      // postJsonFields: 200 dönse bile sql/explanation eksikse hata fırlatır —
+      // aksi halde ekran sessizce boş kalıyordu.
+      const data = await postJsonFields<{ sql: string; explanation: string }>(
+        '/api/sql/generate',
+        { query, lang },
+        ['sql', 'explanation']
+      )
+      setSql(data.sql)
+      setExplanation(data.explanation)
     } catch (err) {
-      console.error(err)
-      setError(s.errorServer)
+      setError(err instanceof Error ? err.message : s.errorServer)
     } finally {
       setLoading(false)
     }

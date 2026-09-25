@@ -31,7 +31,14 @@ export default function HistoryPage() {
       const data = await getHistory()
       setHistory(data || [])
     } catch (error) {
+      // Hata yutulursa sayfa "geçmiş boş" gibi görünüyordu; farkı kullanıcıya söyle.
       console.error('History fetch error:', error)
+      toast(
+        lang === 'tr'
+          ? 'Geçmiş yüklenemedi. Lütfen sayfayı yenileyin.'
+          : 'Could not load history. Please refresh the page.',
+        'error'
+      )
     } finally {
       setLoading(false)
     }

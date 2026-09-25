@@ -2,6 +2,14 @@
 
 import { useState, useCallback, useRef } from 'react'
 
+/** Oturum/limit gibi yaygın HTTP durumlarını anlaşılır Türkçe metne çevirir. */
+function statusMessage(status: number, serverError?: string): string {
+  if (status === 401) return 'Oturumunuz sona ermiş. Lütfen tekrar giriş yapın.'
+  if (status === 429) return 'Çok fazla istek gönderildi. Lütfen bir dakika bekleyip tekrar deneyin.'
+  if (status === 503) return 'Yapay zeka servisi şu anda yoğun. Lütfen birazdan tekrar deneyin.'
+  return serverError || `İstek başarısız oldu (HTTP ${status}).`
+}
+
 /**
  * Streaming üretim modülleri için ortak hook.
  * fetch + loading + error + token-token akış okumayı tek yerde toplar.
@@ -44,7 +52,7 @@ export function useGenerate(endpoint: string) {
 
         if (!res.ok || !res.body) {
           const data = await res.json().catch(() => null)
-          throw new Error(data?.error || 'İstek başarısız oldu.')
+          throw new Error(statusMessage(res.status, data?.error))
         }
 
         const reader = res.body.getReader()
@@ -56,13 +64,25 @@ export function useGenerate(endpoint: string) {
           acc += decoder.decode(value, { stream: true })
           setText(acc)
         }
+
+        // Akış hatasız bitti ama tek bir token bile gelmedi (ör. model bütçesini
+        // "düşünme"ye harcadı). Eskiden bu durumda ne metin ne hata gösteriliyordu;
+        // sayfa sessizce başlangıç haline dönüyordu.
+        if (!acc.trim()) {
+          throw new Error('Yapay zeka boş yanıt döndürdü. Lütfen tekrar deneyin.')
+        }
         return acc
       } catch (e) {
         // Kullanıcı iptal ettiyse hata gösterme — o ana kadar gelen metni koru.
         if (e instanceof DOMException && e.name === 'AbortError') {
           return null
         }
-        const message = e instanceof Error ? e.message : 'Beklenmeyen bir hata oluştu.'
+        const message =
+          e instanceof TypeError
+            ? 'Sunucuya ulaşılamadı. İnternet bağlantınızı kontrol edip tekrar deneyin.'
+            : e instanceof Error
+              ? e.message
+              : 'Beklenmeyen bir hata oluştu.'
         setError(message)
         return null
       } finally {

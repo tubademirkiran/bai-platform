@@ -5,6 +5,8 @@ import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
+import { ErrorBanner } from '@/components/ui/error-banner'
+import { postJson } from '@/lib/api-client'
 import {
   Loader2, Palette, Monitor, Smartphone, Tablet, MousePointerClick, Code2,
   Download, Pencil, FileText, Link2, Package, Square, type LucideIcon, Layout
@@ -20,6 +22,7 @@ export default function WireframePage() {
   const [platform, setPlatform] = useState<Platform>('web')
   const [style, setStyle] = useState<DesignStyle>('hifi')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<any>(null)
   const [activeTab, setActiveTab] = useState<OutputTab>('preview')
   const [revisionCmd, setRevisionCmd] = useState('')
@@ -28,32 +31,37 @@ export default function WireframePage() {
   async function handleGenerate() {
     if (!requirement.trim()) return
     setLoading(true)
+    setError(null)
     setResult(null)
-    const response = await fetch('/api/wireframe/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ requirement, platform, style, lang }),
-    })
-    const data = await response.json()
-    setResult(data.result)
-    setLoading(false)
+    try {
+      setResult(await postJson('/api/wireframe/generate', { requirement, platform, style, lang }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Wireframe üretilemedi. Lütfen tekrar deneyin.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleRevision() {
     if (!revisionCmd.trim() || !result) return
     setRevising(true)
-    const response = await fetch('/api/wireframe/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
+    setError(null)
+    try {
+      // Revizyon başarısız olursa mevcut tasarımı KORU — üzerine null yazmak
+      // kullanıcının elindeki çalışmayı sessizce siliyordu.
+      const revised = await postJson('/api/wireframe/generate', {
         requirement: `Mevcut tasarim: ${JSON.stringify(result.components)}\n\nRevizyon: ${revisionCmd}`,
-        platform, style, lang,
-      }),
-    })
-    const data = await response.json()
-    setResult(data.result)
-    setRevisionCmd('')
-    setRevising(false)
+        platform,
+        style,
+        lang,
+      })
+      setResult(revised)
+      setRevisionCmd('')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Revizyon uygulanamadı. Lütfen tekrar deneyin.')
+    } finally {
+      setRevising(false)
+    }
   }
 
   function handleDownload() {
@@ -103,6 +111,8 @@ export default function WireframePage() {
         description={lang === 'tr' ? 'Gereksinimden otomatik ekran taslağı ve tıklanabilir prototip üret.' : 'Generate wireframe and clickable prototype from requirements.'}
         icon={Layout}
       />
+
+      {error && <ErrorBanner message={error} onRetry={handleGenerate} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: '340px minmax(0, 1fr)', gap: '16px' }}>
 

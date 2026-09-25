@@ -6,6 +6,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { EmptyState } from '@/components/ui/empty-state'
 import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
+import { ErrorBanner } from '@/components/ui/error-banner'
+import { postJson } from '@/lib/api-client'
 import { Loader2, Users } from 'lucide-react'
 
 type TechLevel = 'Düşük' | 'Orta' | 'Yüksek' | 'Low' | 'Medium' | 'High'
@@ -28,23 +30,19 @@ export default function PersonaPage() {
   const [audience, setAudience] = useState('')
   const [count, setCount] = useState<1 | 2 | 3>(2)
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<{ personas: Persona[] } | null>(null)
 
   async function handleGenerate() {
     if (!product.trim()) return
     setLoading(true)
+    setError(null)
     setResult(null)
-    
+
     try {
-      const response = await fetch('/api/persona/generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ product, audience, count, lang }),
-      })
-      const data = await response.json()
-      setResult(data.result)
-    } catch (error) {
-      console.error(error)
+      setResult(await postJson('/api/persona/generate', { product, audience, count, lang }))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Persona üretilemedi. Lütfen tekrar deneyin.')
     } finally {
       setLoading(false)
     }
@@ -76,8 +74,10 @@ export default function PersonaPage() {
       <PageHeader 
         title="Persona Generator" 
         description={lang === 'tr' ? 'Gereksinimleriniz için hedef kitle profilleri ve UX tavsiyeleri üretin.' : 'Generate target audience profiles and UX advice for your requirements.'} 
-        icon={Users} 
+        icon={Users}
       />
+
+      {error && <ErrorBanner message={error} onRetry={handleGenerate} />}
 
       <div style={{ display: 'grid', gridTemplateColumns: '340px minmax(0, 1fr)', gap: '16px', alignItems: 'start', flex: 1, minHeight: 0 }}>
         

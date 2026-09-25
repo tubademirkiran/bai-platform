@@ -5,6 +5,8 @@ import { useTheme } from '@/lib/theme-context'
 import { Textarea } from '@/components/ui/textarea'
 import { PageHeader } from '@/components/ui/page-header'
 import { CopyButton } from '@/components/ui/copy-button'
+import { ErrorBanner } from '@/components/ui/error-banner'
+import { postJson } from '@/lib/api-client'
 import { Loader2, Scale, Target, BarChart3, ListChecks, LineChart, Upload, Lightbulb, type LucideIcon, CheckCircle2 } from 'lucide-react'
 
 type Method = 'value_effort' | 'moscow' | 'rice'
@@ -16,6 +18,7 @@ export default function PrioritizationPage() {
   const [requirements, setRequirements] = useState('')
   const [method, setMethod] = useState<Method>('value_effort')
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const [results, setResults] = useState<Record<Method, any | null>>({
     value_effort: null,
@@ -39,18 +42,17 @@ export default function PrioritizationPage() {
   async function handleAnalyze() {
     if (!requirements.trim()) return
     setLoading(true)
-    
-    const response = await fetch('/api/prioritization/generate', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ goal, requirements, method, lang }),
-    })
-    
-    const data = await response.json()
-    
-    setResults(prev => ({ ...prev, [method]: data.result }))
-    setCurrentTab('list')
-    setLoading(false)
+    setError(null)
+
+    try {
+      const result = await postJson('/api/prioritization/generate', { goal, requirements, method, lang })
+      setResults(prev => ({ ...prev, [method]: result }))
+      setCurrentTab('list')
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Önceliklendirme yapılamadı. Lütfen tekrar deneyin.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   const buildExportText = () => {
@@ -92,6 +94,7 @@ export default function PrioritizationPage() {
           description={lang === 'tr' ? 'Gereksinimleri iş hedefine göre analiz et ve yapay zeka ile önceliklendir.' : 'Analyze and prioritize requirements based on business goals using AI.'}
           icon={Scale}
         />
+        {error && <ErrorBanner message={error} onRetry={handleAnalyze} />}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '340px minmax(0, 1fr)', gap: '16px', flex: 1, minHeight: 0 }}>
