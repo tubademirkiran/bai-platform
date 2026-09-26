@@ -69,7 +69,7 @@ Provide detailed risk analysis under 4 headers:
 # 💡 PMO STRATEGIC RECOMMENDATIONS
 - 3 high-leverage strategic suggestions for delivery success.`
 
-    const stream = await streamGroq({ user: prompt, maxTokens: 1500 })
+    const stream = await streamGroq({ user: prompt, maxTokens: 4000 })
     const captured = captureStream(stream, (full) =>
       saveHistoryServer(
         'Risk Analyzer',

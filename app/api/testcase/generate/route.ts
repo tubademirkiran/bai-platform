@@ -40,10 +40,17 @@ ${requirement}
 ## 3. Test Senaryoları
 Her senaryoyu şu tablo formatında listele:
 
-| ID | Senaryo | Tip (Pozitif/Negatif/Sınır) | Adımlar | Beklenen Sonuç |
-| --- | ------- | --------------------------- | ------- | -------------- |
+| ID | Senaryo | Tip | Adımlar | Beklenen Sonuç |
+| --- | ------- | --- | ------- | -------------- |
 
 - En az 6-8 senaryo üret: happy path, hatalı girdi, yetki/güvenlik, sınır değer ve iptal/rollback senaryolarını kapsa.
+
+TABLO BİÇİM KURALLARI (okunabilirlik için zorunlu):
+- ID: sadece TC01, TC02, ... yaz. Kalınlaştırma (**) veya başka işaret ekleme.
+- Senaryo: en fazla 6 kelimelik KISA bir başlık olsun, cümle kurma.
+- Tip: tek kelime — Pozitif, Negatif veya Sınır.
+- Adımlar ve Beklenen Sonuç: maddeleri "1. ", "2. " diye numaralandır ve her maddeyi <br> ile ayır.
+- Hücre içinde satır sonu için YALNIZCA <br> kullan; başka HTML etiketi kullanma.
 
 ## 4. Gherkin Kabul Kriterleri
 En kritik 2-3 senaryo için Given / When / Then formatında yaz.
@@ -57,7 +64,9 @@ En kritik 2-3 senaryo için Given / When / Then formatında yaz.
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.15,
-      maxTokens: 4000,
+      // 6-8 satırlık tablo + Gherkin + riskler uzun bir belge; 4000 görünür token
+      // karmaşık gereksinimlerde 3. bölümün ilk satırında bitiyordu.
+      maxTokens: 12000,
     })
     const captured = captureStream(stream, (full) => saveHistoryServer('Test Case', requirement, full))
     return new Response(captured, {

@@ -65,7 +65,7 @@ GEREKSİNİMLER:
         { role: 'user', content: userPrompt },
       ],
       temperature: 0.2,
-      maxTokens: 1200,
+      maxTokens: 4000,
     })
     const captured = captureStream(stream, (full) => saveHistoryServer('Meeting Analyzer', transcript, full))
     return new Response(captured, {

@@ -282,6 +282,86 @@ export async function callGroqJSON<T = unknown>(opts: GroqOptions): Promise<T> {
   throw new GroqError('Yapay zeka geçerli bir JSON formatı üretemedi.', 502)
 }
 
+/**
+ * Yanıt token bütçesi dolup kesildiğinde kaç kez otomatik "devam" turu yapılacağı.
+ * Her tur yeni bir istek olduğu için bütçe sıfırlanır; 3 tur pratikte 4x çıktı demek.
+ */
+const MAX_CONTINUATIONS = 3
+/** Devam turunun başındaki tekrarı yakalamak için bakılan kuyruk/baş uzunluğu (karakter). */
+const OVERLAP_WINDOW = 400
+/** Bundan kısa örtüşmeler rastlantısal olabilir (boşluk, "|" vb.) — kırpma. */
+const MIN_OVERLAP = 8
+
+const CONTINUE_PROMPT = `Önceki yanıtın token sınırı nedeniyle TAM ORTASINDA kesildi.
+Aynı yanıtı kaldığın yerden sürdür:
+- Önsöz, özür, "devam ediyorum" gibi hiçbir açıklama ekleme.
+- Sana gösterilen metinde ZATEN yazdığın başlıkları ve satırları TEKRAR ETME.
+- İstenen yapıya sadık kalarak belgeyi SONUNA KADAR tamamla.`
+
+/** Kesilirken atılan yarım satır varsa devam istemine eklenen ek yönerge. */
+function continuePromptWith(dropped: string): string {
+  if (!dropped.trim()) return CONTINUE_PROMPT
+  return `${CONTINUE_PROMPT}
+
+Son satırın yarım kaldı ve kullanıcıya GÖSTERİLMEDİ:
+"""${dropped}"""
+Yanıtına bu satırı BAŞTAN ve eksiksiz yazarak başla, ardından devam et.`
+}
+
+/**
+ * Devam turu, kesilen son satırı baştan yazdığı için metnin başı zaten gönderilmiş
+ * olan kısımla örtüşebilir. Örtüşen en uzun parçayı kırparak tekrarı önler.
+ */
+function stripOverlap(tail: string, head: string): string {
+  const max = Math.min(tail.length, head.length)
+  for (let k = max; k >= MIN_OVERLAP; k--) {
+    if (head.startsWith(tail.slice(tail.length - k))) return head.slice(k)
+  }
+  return head
+}
+
+/**
+ * Tek bir SSE gövdesini tüketir, içerik parçalarını `emit` ile dışarı verir ve
+ * yanıtın neden bittiğini (finish_reason) döndürür.
+ */
+async function pumpSse(
+  body: ReadableStream<Uint8Array>,
+  emit: (text: string) => void
+): Promise<string | null> {
+  const decoder = new TextDecoder()
+  const reader = body.getReader()
+  let buffer = ''
+  let finishReason: string | null = null
+  try {
+    while (true) {
+      const { done, value } = await reader.read()
+      if (done) break
+      buffer += decoder.decode(value, { stream: true })
+
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed.startsWith('data:')) continue
+        const payload = trimmed.slice(5).trim()
+        if (payload === '[DONE]') return finishReason
+        try {
+          const json = JSON.parse(payload)
+          const choice = json?.choices?.[0]
+          if (choice?.delta?.content) emit(choice.delta.content)
+          if (choice?.finish_reason) finishReason = choice.finish_reason
+        } catch {
+          // Parçalı JSON paketlerini atla
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+  return finishReason
+}
+
 export function captureStream(
   stream: ReadableStream<Uint8Array>,
   onComplete: (fullText: string) => void | Promise<void>
@@ -304,69 +384,126 @@ export function captureStream(
   return stream.pipeThrough(transform)
 }
 
+/**
+ * Akışlı üretim. Yanıt token bütçesi dolup yarıda kesilirse (finish_reason:"length")
+ * OTOMATİK olarak devam turu açar ve kalan metni aynı akışa ekler.
+ *
+ * NEDEN: Gemini 3.x'te "düşünme" tokenları da max_tokens bütçesinden harcanıyor, bu
+ * yüzden karmaşık girdilerde görünür çıktı belgenin ortasında (ör. tablonun ilk
+ * satırında) kesilebiliyordu. Eskiden bu durum yalnızca sunucu loguna yazılıyor,
+ * kullanıcıya yarım belge gidiyordu. Artık kesilme sessiz bir veri kaybı değil.
+ */
 export async function streamGroq(opts: GroqOptions): Promise<ReadableStream<Uint8Array>> {
-  // Yeniden deneme/yedek model seçimi akış BAŞLAMADAN önce biter; istemciye
-  // yalnızca çalışan bir modelin gövdesi aktarılır.
-  const response = await fetchWithFallback((model) => ({
+  const baseMessages = buildMessages(opts)
+  const buildBody = (model: string, messages: ChatMessage[]): Record<string, unknown> => ({
     model,
-    messages: buildMessages(opts),
+    messages,
     max_tokens: resolveMaxTokens(opts.maxTokens),
     temperature: opts.temperature ?? 0.1,
     ...(opts.reasoningEffort ? { reasoning_effort: opts.reasoningEffort } : {}),
     stream: true,
-  }))
+  })
 
-  if (!response.body) {
+  // Yeniden deneme/yedek model seçimi akış BAŞLAMADAN önce biter; istemciye
+  // yalnızca çalışan bir modelin gövdesi aktarılır. İlk istek burada yapılır ki
+  // kota/model hataları route'un catch bloğuna düşüp düzgün JSON hata dönebilsin.
+  const first = await fetchWithFallback((model) => buildBody(model, baseMessages))
+
+  if (!first.body) {
     throw new GroqError('Yapay zeka servisi boş bir akış döndürdü. Lütfen tekrar deneyin.', 502)
   }
 
-  const upstream = response.body
   const encoder = new TextEncoder()
-  const decoder = new TextDecoder()
 
   return new ReadableStream<Uint8Array>({
     async start(controller) {
-      const reader = upstream.getReader()
-      let buffer = ''
+      let full = ''
+
+      /**
+       * Bir turu akıtır.
+       *
+       * İki tampon var:
+       *  - `pending`: son satır tamamlanana (\n gelene) kadar bekletilir. Tur kesilirse
+       *    bu YARIM SATIR HİÇ GÖNDERİLMEZ; devam turunda modele baştan yazdırılır.
+       *    Yarım satır gönderilseydi model onu tekrar yazdığında ekranda "|| TC02"
+       *    gibi bozuk tablo satırları ve tekrar eden cümleler oluşuyordu.
+       *  - `head`: devam turunun ilk OVERLAP_WINDOW karakteri. Model zaten yazılmış
+       *    tam satırları tekrarlarsa örtüşen kısım kırpılır (ikinci güvenlik ağı).
+       */
+      const runRound = async (body: ReadableStream<Uint8Array>, isContinuation: boolean) => {
+        const tail = full.slice(-OVERLAP_WINDOW)
+        let head = ''
+        let headFlushed = !isContinuation
+        let pending = ''
+        let pushed = 0
+
+        const push = (text: string) => {
+          full += text
+          pushed += text.length
+          controller.enqueue(encoder.encode(text))
+        }
+        // Yalnızca satır sonuna kadar olan kısmı gönder, gerisini beklet.
+        const accept = (text: string) => {
+          pending += text
+          const cut = pending.lastIndexOf('\n')
+          if (cut === -1) return
+          push(pending.slice(0, cut + 1))
+          pending = pending.slice(cut + 1)
+        }
+        const flushHead = () => {
+          headFlushed = true
+          const cleaned = stripOverlap(tail, head)
+          head = ''
+          if (cleaned) accept(cleaned)
+        }
+
+        const finishReason = await pumpSse(body, (text) => {
+          if (headFlushed) accept(text)
+          else if ((head += text).length >= OVERLAP_WINDOW) flushHead()
+        })
+        if (!headFlushed) flushHead()
+
+        // Kesildi ve bu turda en az bir tam satır ürettiysek yarım satırı at.
+        // Hiç tam satır çıkmadıysa atmak ilerlemeyi sıfırlar — o zaman gönder.
+        if (finishReason === 'length' && pushed > 0) return { finishReason, dropped: pending }
+        if (pending) push(pending)
+        return { finishReason, dropped: '' }
+      }
+
       try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
-          buffer += decoder.decode(value, { stream: true })
-
-          const lines = buffer.split('\n')
-          buffer = lines.pop() ?? ''
-
-          for (const line of lines) {
-            const trimmed = line.trim()
-            if (!trimmed.startsWith('data:')) continue
-            const payload = trimmed.slice(5).trim()
-            if (payload === '[DONE]') {
-              controller.close()
-              return
-            }
-            try {
-              const json = JSON.parse(payload)
-              const choice = json?.choices?.[0]
-              const delta = choice?.delta?.content
-              if (delta) controller.enqueue(encoder.encode(delta))
-              // Streaming'de kesilme hata olarak fırlatılamaz (kullanıcı o ana kadarki
-              // metni zaten görüyor); en azından sunucu logunda görünür olsun.
-              if (choice?.finish_reason === 'length') {
-                console.warn(
-                  '[groq] Yanıt token bütçesi dolduğu için kesildi. İlgili route için maxTokens değerini artırın.'
-                )
-              }
-            } catch {
-              // Parçalı JSON paketlerini atla
-            }
+        let response = first
+        for (let round = 0; ; round++) {
+          const { finishReason, dropped } = await runRound(response.body!, round > 0)
+          if (process.env.GEMINI_DEBUG) {
+            console.warn(`[gemini:debug] tur ${round} finish_reason=${finishReason} atılan=${dropped.length}`)
           }
+          if (finishReason !== 'length') break
+
+          if (round >= MAX_CONTINUATIONS) {
+            console.warn(
+              `[gemini] Yanıt ${MAX_CONTINUATIONS} devam turundan sonra hâlâ kesik. ` +
+                'İlgili route için maxTokens değerini artırın veya çıktıyı bölün.'
+            )
+            break
+          }
+          console.warn(
+            `[gemini] Yanıt token bütçesi dolduğu için kesildi; otomatik devam turu ${round + 1}/${MAX_CONTINUATIONS}.`
+          )
+
+          response = await fetchWithFallback((model) =>
+            buildBody(model, [
+              ...baseMessages,
+              { role: 'assistant', content: full },
+              { role: 'user', content: continuePromptWith(dropped) },
+            ])
+          )
+          if (!response.body) break
         }
         controller.close()
       } catch (err) {
+        // Hata akışa yansıtılır: istemci o ana kadarki metni ekranda tutar ve
+        // üstüne hata bandını gösterir — yarım çıktı sessizce "tamam" görünmesin.
         controller.error(err)
-      } finally {
-        reader.releaseLock()
       }
     },
   })

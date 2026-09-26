@@ -145,6 +145,41 @@
 }
 
 /* =========================================
+   MARKDOWN TABLOLARI  (components/ui/prose.tsx)
+
+   Sütun genişlikleri nth-child gerektirdiği için inline style ile verilemiyor.
+   Sorun: "Adımlar" / "Beklenen Sonuç" gibi çok uzun sütunlar, tarayıcının
+   otomatik tablo yerleşiminde "ID" ve "Senaryo" sütunlarını ezip okunmaz hale
+   getiriyordu. Aşağıdaki alt sınırlar bunu engelliyor; dar ekranda tablo
+   ezilmek yerine yatay kayar (sarmalayıcıda overflow-x: auto var).
+   ========================================= */
+
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 680px;
+}
+
+.md-table th,
+.md-table td {
+  min-width: 88px;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+/* 1. sütun kısa bir kimliktir (TC01) — dar kalsın ama satıra bölünmesin. */
+.md-table th:first-child,
+.md-table td:first-child {
+  min-width: 64px;
+}
+
+/* 2. sütun senaryo/başlık adıdır — uzun sütunlar tarafından ezilmesin. */
+.md-table th:nth-child(2),
+.md-table td:nth-child(2) {
+  min-width: 180px;
+}
+
+/* =========================================
    ZARİF SCROLLBAR TASARIMI (UI/UX İYİLEŞTİRMESİ)
    ========================================= */
 
